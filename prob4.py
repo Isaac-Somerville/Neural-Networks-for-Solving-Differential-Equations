@@ -1,9 +1,4 @@
 #%%
-"""
-HW: read Nielsen
-Look into local minima stuff
-Generalise this code
-"""
 
 import torch
 import torch.utils.data
@@ -32,8 +27,38 @@ class Fitter(torch.nn.Module):
         hidden = torch.sigmoid(self.fc1(x))
         y = self.fc2(hidden)
         return y
+    
+class DiffEq1():
+    def __init__(self, xrange, num_samples):
+        self.xrange = xrange
+        self.num_samples = num_samples
+        
+    def solution1(x):
+        return torch.sin(x)
+    
+    def f1_trial(x,n1_out):
+        return x * n1_out
+    
+    def df1_trial(x,n1_out,dn1dx):
+        return n1_out + x*dn1dx
+    
+    def solution2(x):
+        return 1 + x**2
+    
+    def f2_trial(x, n2_out):
+        return 1 + x*n2_out
+    
+    def df2_trial(x, n2_out, dn2dx):
+        return n2_out + x * dn2dx
+    
+    #TODO: questa roba qui
+    def diffEq1(x, f1_trial, f2_trial, dn1dx):
+        return
+    
+    def diffEq2(x, f1_trial, f2_trial, dn2dx):
+        return
 
-def train(network, loader, loss_fn, optimiser, solution, trialFunc, dTrialFunc, diffEq, epochs, iterations):
+def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     """Trains the neural network"""
     cost_list=[]
     network.train(True)
@@ -45,14 +70,16 @@ def train(network, loader, loss_fn, optimiser, solution, trialFunc, dTrialFunc, 
             # Get the derivative of the network output with respect
             # to the input values. 
             dndx = torch.autograd.grad(n_out, x, torch.ones_like(n_out), retain_graph=True, create_graph=True)[0]
-            
+            d2ndx2 = torch.autograd.grad(dndx, x, torch.ones_like(dndx), retain_graph=True, create_graph=True)[0]
             
             # Get value of trial solution f(x)
             f_trial = trialFunc(x, n_out)
             # Get df / dx
             df_trial = dTrialFunc(x, n_out, dndx)
+            # Get d^2f / dx^2
+            d2f_trial = d2TrialFunc(x,n_out,dndx,d2ndx2)
             # Get LHS of diff equation D(x) = 0
-            diff_eq = diffEq(x, f_trial, df_trial)
+            diff_eq = diffEq(x, f_trial, df_trial, d2f_trial)
             
             loss = loss_fn(diff_eq, torch.zeros_like(diff_eq))
             cost_list.append(loss.detach().numpy())
@@ -78,66 +105,41 @@ def plotNetwork(network, solution, trialFunc, epoch, epochs, iterations):
     plt.title(str(epoch + iterations*epochs) + " Epochs")
     plt.show()
     
-def solution1(x):
-    """
-    Analytic solution to Lagaris problem 1
-    """
-    return (torch.exp(-(x**2)/2) / (1 + x + x**3))+ x**2 
-
-def trialFunc1(x, n_out):
-    """
-    Trial solution to Lagaris problem 1
-    f(x) = 1 + x * N(x)
-    """ 
-    return 1 + x * n_out
-
-def dTrialFunc1(x, n_out, dndx):
-    """
-    Derivative of trial solution to Lagaris problem 1
-    f'(x) = N(x) + x * N'(x)
-    """ 
-    return n_out + x * dndx
-
-def diffEq1(x, f_trial, df_trial):
     
-    
+def solution3(x):
     """
-    Returns LHS of differential equation D(x) = 0
-    for Lagaris problem 1
-    """
-    RHS = x**3 + 2*x + (x**2 * ((1+3*x**2) / (1 + x + x**3)))
-    LHS = df_trial + ((x + (1+3*(x**2)) / (1 + x + x**3) ) * f_trial)
-    return LHS - RHS
-    
-def solution2(x):
-    """
-    Analytic solution to Lagaris problem 1
+    Analytic solution to Lagaris problem 3
     """
     return torch.exp(-x/5) * torch.sin(x)
 
-def trialFunc2(x, n_out):
+def trialFunc3(x, n_out):
     """
-    Trial solution to Lagaris problem 1
-    f(x) = x * N(x)
+    Trial solution to Lagaris problem 3
+    f(x) = x + x^2 * N(x)
     """ 
-    return x * n_out
+    return x + (x**2 * n_out)
 
-def dTrialFunc2(x, n_out, dndx):
+def dTrialFunc3(x, n_out, dndx):
     """
-    Derivative of trial solution to Lagaris problem 1
-    f'(x) = N(x) + x * N'(x)
+    Derivative of trial solution to Lagaris problem 3
+    f'(x) = 1 + 2xN(x) + x^2 * N'(x)
     """ 
-    return n_out + x * dndx
+    return 1 + (2*x*n_out) + (x**2 * dndx)
 
-def diffEq2(x, f_trial, df_trial):
-    
-    
+def d2TrialFunc3(x,n_out,dndx,d2ndx2):
+    """
+    Second derivative of trial solution to Lagaris problem 3
+    f''(x) = 2N(x) + (4x * N'(x)) + x^2 N''(x)
+    """ 
+    return 2*n_out + (4*x*dndx) + (x**2 * d2ndx2)
+
+def diffEq3(x, f_trial, df_trial, d2f_trial):
     """
     Returns LHS of differential equation D(x) = 0
     for Lagaris problem 1
     """
-    RHS = df_trial + (1/5)*f_trial
-    LHS = torch.exp(-x/5) * torch.cos(x)
+    LHS = d2f_trial + (1/5)*df_trial + f_trial
+    RHS = -(1/5) * torch.exp(-x/5) * torch.cos(x)
     return LHS - RHS
     
 xrange=[0, 2]
@@ -148,22 +150,18 @@ train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=60, shu
 loss_fn      = torch.nn.MSELoss()
 optimiser    = torch.optim.Adam(network.parameters(), lr=1e-2)
 
-# solution = solution1
-# trialFunc = trialFunc1
-# dTrialFunc = dTrialFunc1
-# diffEq = diffEq1
-
-solution = solution2
-trialFunc = trialFunc2
-dTrialFunc = dTrialFunc2
-diffEq = diffEq2
+solution = solution3
+trialFunc = trialFunc3
+dTrialFunc = dTrialFunc3
+d2TrialFunc = d2TrialFunc3
+diffEq = diffEq3
 
 losses = [1]
 iterations = 0
 epochs = 5000
 while losses[-1] > 0.001 and iterations < 10:
     losses.extend( train(network, train_loader, loss_fn, optimiser, solution, 
-                         trialFunc, dTrialFunc, diffEq, epochs, iterations))
+                         trialFunc, dTrialFunc, d2TrialFunc, diffEq, epochs, iterations))
     iterations += 1
 losses = losses[1:]
 print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
@@ -172,5 +170,3 @@ plt.semilogy(losses)
 plt.xlabel("Epochs")
 plt.ylabel("Log of Loss")
 plt.title("Loss")
-
-# %%
