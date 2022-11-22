@@ -112,7 +112,7 @@ network      = Fitter(num_hidden_nodes=10)
 train_set    = DataSet(num_samples,  xrange)
 train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=60, shuffle=True)
 loss_fn      = torch.nn.MSELoss()
-optimiser    = torch.optim.Adam(network.parameters(), lr=1e-3)
+optimiser    = torch.optim.Adam(network.parameters(), lr=1e-4)
 
 solution = solution1
 trialFunc = trialFunc1
