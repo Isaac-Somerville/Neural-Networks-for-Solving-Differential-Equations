@@ -96,14 +96,15 @@ def train(network1, network2, loader, loss_fn, optimiser, diffEq, epochs, iterat
             # Get df1 / dx and df2 / dx
             df1_trial = diffEq.df1_trial(x, n1_out, dn1dx)
             df2_trial = diffEq.df2_trial(x, n2_out, dn2dx)
-            # Get LHS of diff equation D1(x) = 0, D2(x) = 0
+            # Get LHS of diff equations D1(x) = 0, D2(x) = 0
             D1 = diffEq.diffEq1(x, f1_trial, f2_trial, df1_trial)
             D2 = diffEq.diffEq2(x, f1_trial, f2_trial, df2_trial)
-            # Combine these into one tensor
-            D = torch.cat((D1,D2))
+
             
             # Calculate and store loss
-            loss = loss_fn(D, torch.zeros_like(D))
+            loss1 = loss_fn(D1, torch.zeros_like(D1))
+            loss2 = loss_fn(D2, torch.zeros_like(D2))
+            loss = loss1 + loss2
             cost_list.append(loss.detach().numpy())
             
             # Optimization algorithm
@@ -151,15 +152,13 @@ def plotNetwork(network1, network2, diffEq, epoch, epochs, iterations):
 xrange=[0, 3]
 num_samples = 30
 diffEq = DiffEq(xrange, num_samples)
-network1     = Fitter(num_hidden_nodes=10)
-network2     = Fitter(num_hidden_nodes=10)
+network1     = Fitter(num_hidden_nodes=20)
+network2     = Fitter(num_hidden_nodes=20)
 train_set    = DataSet(num_samples,  xrange)
 train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=60, shuffle=True)
 loss_fn      = torch.nn.MSELoss()
-parameters = set()
-parameters |= set(network1.parameters())
-parameters |= set(network2.parameters())
-optimiser  = torch.optim.Adam(parameters, lr=1e-3)
+params = list(network1.parameters()) + list(network2.parameters())
+optimiser  = torch.optim.Adam(params, lr = 1e-1)
 
 losses = [1]
 iterations = 0
@@ -176,3 +175,4 @@ plt.semilogy(losses)
 plt.xlabel("Epochs")
 plt.ylabel("Log of Loss")
 plt.title("Loss")
+# %%

@@ -11,7 +11,6 @@ LR = 1e-1, converges after 6000 epochs, loss 1e-5
 
 HW: read Nielsen
 Look into local minima stuff
-Generalise this code
 """
 
 import torch
