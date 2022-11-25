@@ -24,7 +24,7 @@ class Fitter(torch.nn.Module):
         self.fc2 = torch.nn.Linear(num_hidden_nodes, 2)
 
     def forward(self, x):
-        hidden = torch.sigmoid(self.fc1(x))
+        hidden = torch.tanh(self.fc1(x))
         y = self.fc2(hidden)
         y  = y.transpose(0,1)
         y1, y2 = y[0].view(-1,1), y[1].view(-1,1)
@@ -50,30 +50,30 @@ class DiffEq():
     
     def df1_trial(self, x, n1_out, dn1dx):
         """Derivative of trial solution f1'(x) to first DE"""
-        return n1_out + x*dn1dx
+        return n1_out + (x * dn1dx)
     
     def solution2(self, x):
         """Analytic solution to second DE"""
-        return 1 + x**2
+        return 1 + (x)**2
     
     def f2_trial(self, x, n2_out):
         """Trial solution f2(x) to second DE"""
-        return 1 + x*n2_out
+        return 1 + (x * n2_out)
     
     def df2_trial(self, x, n2_out, dn2dx):
         """Derivative of trial solution f2'(x) to second DE"""
-        return n2_out + x * dn2dx
+        return n2_out + (x * dn2dx)
     
     def diffEq1(self, x, f1_trial, f2_trial, df1_trial):
         """Returns D1(x) where first DE is D1(x) = 0"""
         LHS = df1_trial
-        RHS = torch.cos(x) + f1_trial**2 + f2_trial - (1 + x**2 + torch.sin(x)**2)
+        RHS = torch.cos(x) + (f1_trial)**2 + f2_trial - (1 + x**2 + (torch.sin(x))**2)
         return LHS - RHS
     
     def diffEq2(self, x, f1_trial, f2_trial, df2_trial):
         """Returns D2(x) where second DE is D2(x) = 0"""
         LHS = df2_trial
-        RHS = 2*x - ((1+x**2)*torch.sin(x)) + (f1_trial*f2_trial)
+        RHS = 2*x - ((1 + (x)**2)*torch.sin(x)) + (f1_trial*f2_trial)
         return LHS - RHS
 
 def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
