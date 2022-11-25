@@ -21,12 +21,14 @@ class Fitter(torch.nn.Module):
     def __init__(self, num_hidden_nodes):
         super(Fitter, self).__init__()
         self.fc1 = torch.nn.Linear(1, num_hidden_nodes)
-        self.fc2 = torch.nn.Linear(num_hidden_nodes, 1)
+        self.fc2 = torch.nn.Linear(num_hidden_nodes, 2)
 
     def forward(self, x):
         hidden = torch.sigmoid(self.fc1(x))
         y = self.fc2(hidden)
-        return y
+        y  = y.transpose(0,1)
+        y1, y2 = y[0].view(-1,1), y[1].view(-1,1)
+        return y1, y2
     
 class DiffEq():
     """
@@ -74,16 +76,14 @@ class DiffEq():
         RHS = 2*x - ((1+x**2)*torch.sin(x)) + (f1_trial*f2_trial)
         return LHS - RHS
 
-def train(network1, network2, loader, loss_fn, optimiser, diffEq, epochs, iterations):
+def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     """Trains the neural network"""
     cost_list=[]
-    network1.train(True)
-    network2.train(True)
+    network.train(True)
     for epoch in range(epochs+1):
         for batch in loader:
             x = batch.view(-1, 1)
-            n1_out = network1(x)
-            n2_out = network2(x)
+            n1_out, n2_out = network(x)
 
             # Get the derivative of both networks' outputs with respect
             # to the input values. 
@@ -100,7 +100,6 @@ def train(network1, network2, loader, loss_fn, optimiser, diffEq, epochs, iterat
             D1 = diffEq.diffEq1(x, f1_trial, f2_trial, df1_trial)
             D2 = diffEq.diffEq2(x, f1_trial, f2_trial, df2_trial)
 
-            
             # Calculate and store loss
             loss1 = loss_fn(D1, torch.zeros_like(D1))
             loss2 = loss_fn(D2, torch.zeros_like(D2))
@@ -113,21 +112,21 @@ def train(network1, network2, loader, loss_fn, optimiser, diffEq, epochs, iterat
             optimiser.zero_grad()
             
         if epoch%(epochs/5)==0:
-            plotNetwork(network1, network2, diffEq, epoch, epochs, iterations)
+            plotNetwork(network, diffEq, epoch, epochs, iterations)
         
-    network1.train(False)
-    network2.train(False)
+    network.train(False)
     return cost_list
 
 
-def plotNetwork(network1, network2, diffEq, epoch, epochs, iterations):
+def plotNetwork(network, diffEq, epoch, epochs, iterations):
     """
     Plots the outputs of both neural networks, along with the
     analytic solution in the same range
     """
     x    = torch.Tensor(np.linspace(xrange[0], xrange[1], num_samples)).view(-1,1)
-    N1   = network1.forward(x).detach().numpy()
-    N2   = network2.forward(x).detach().numpy()
+    N1, N2  = network.forward(x)
+    N1 = N1.detach().numpy()
+    N2 = N2.detach().numpy()
     exact1 = diffEq.solution1(x).detach().numpy()
     exact2 = diffEq.solution2(x).detach().numpy()
     
@@ -152,19 +151,17 @@ def plotNetwork(network1, network2, diffEq, epoch, epochs, iterations):
 xrange=[0, 3]
 num_samples = 30
 diffEq = DiffEq(xrange, num_samples)
-network1     = Fitter(num_hidden_nodes=20)
-network2     = Fitter(num_hidden_nodes=20)
+network     = Fitter(num_hidden_nodes=10)
 train_set    = DataSet(num_samples,  xrange)
-train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=60, shuffle=True)
+train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=30, shuffle=True)
 loss_fn      = torch.nn.MSELoss()
-params = list(network1.parameters()) + list(network2.parameters())
-optimiser  = torch.optim.Adam(params, lr = 1e-2)
+optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 
 losses = [1]
 iterations = 0
 epochs = 5000
 while losses[-1] > 0.001  and iterations < 10:
-    newLoss = train(network1, network2, train_loader, loss_fn,
+    newLoss = train(network, train_loader, loss_fn,
                         optimiser, diffEq, epochs, iterations)
     losses.extend(newLoss)
     iterations += 1
