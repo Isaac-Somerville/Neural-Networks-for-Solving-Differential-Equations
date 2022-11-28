@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 
 class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x-coordinates as test data"""
-    def __init__(self, num_samples, xrange):
-        self.data_in  = torch.linspace(xrange[0], xrange[1], num_samples, requires_grad=True)
+    def __init__(self, num_samples):
+        # self.data_in  = torch.rand(num_samples, requires_grad=True)
+        self.data_in  = torch.linspace(0,1,num_samples, requires_grad=True)
 
     def __len__(self):
         return len(self.data_in)
@@ -21,11 +22,13 @@ class Fitter(torch.nn.Module):
     def __init__(self, num_hidden_nodes):
         super(Fitter, self).__init__()
         self.fc1 = torch.nn.Linear(1, num_hidden_nodes)
-        self.fc2 = torch.nn.Linear(num_hidden_nodes, 2)
+        self.fc2 = torch.nn.Linear(num_hidden_nodes, num_hidden_nodes)
+        self.fc3 = torch.nn.Linear(num_hidden_nodes, 2)
 
     def forward(self, x):
-        hidden = torch.tanh(self.fc1(x))
-        y = self.fc2(hidden)
+        hidden1 = x * torch.sigmoid(self.fc1(x))
+        hidden2 = hidden1 * torch.sigmoid(self.fc2(hidden1))
+        y = self.fc3(hidden2)
         y  = y.transpose(0,1)
         y1, y2 = y[0].view(-1,1), y[1].view(-1,1)
         return y1, y2
@@ -67,13 +70,13 @@ class DiffEq():
     def diffEq1(self, x, f1_trial, f2_trial, df1_trial):
         """Returns D1(x) where first DE is D1(x) = 0"""
         LHS = df1_trial
-        RHS = 3* (torch.cos(3*x) + (f1_trial)**2 + f2_trial - (1 + (3*x)**2 + (torch.sin(3*x))**2))
+        RHS = 3 * (torch.cos(3*x) - (f1_trial)**2 - f2_trial + (1 + (3*x)**2 + (torch.sin(3*x))**2))
         return LHS - RHS
     
     def diffEq2(self, x, f1_trial, f2_trial, df2_trial):
         """Returns D2(x) where second DE is D2(x) = 0"""
         LHS = df2_trial
-        RHS = 3*(2*3*x - ((1 + (3*x)**2)*torch.sin(3*x)) + (f1_trial*f2_trial))
+        RHS = 3 * (2*3*x + ((1 + (3*x)**2)*torch.sin(3*x)) - (f1_trial*f2_trial))
         return LHS - RHS
 
 def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
@@ -81,6 +84,8 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     cost_list=[]
     network.train(True)
     for epoch in range(epochs+1):
+        # train_set    = DataSet(num_samples)
+        # loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=30, shuffle=True)
         for batch in loader:
             x = batch.view(-1, 1)
             n1_out, n2_out = network(x)
@@ -111,7 +116,8 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
             optimiser.step()
             optimiser.zero_grad()
             
-        if epoch%(epochs/5)==0:
+        # if epoch%(epochs/5)==0:
+        if epoch == epochs:
             plotNetwork(network, diffEq, epoch, epochs, iterations)
         
     network.train(False)
@@ -152,7 +158,7 @@ xrange=[0, 1]
 num_samples = 30
 diffEq = DiffEq(xrange, num_samples)
 network     = Fitter(num_hidden_nodes=10)
-train_set    = DataSet(num_samples,  xrange)
+train_set    = DataSet(num_samples)
 train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=30, shuffle=True)
 loss_fn      = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
