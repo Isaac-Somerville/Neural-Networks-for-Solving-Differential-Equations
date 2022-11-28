@@ -9,22 +9,22 @@ import matplotlib.pyplot as plt
 from itertools import chain
 
 def ode_system(u,v,t):
-    return [diff(u,t) - torch.cos(t) - u**2 - v + (1 + t**2 + torch.sin(t)**2),
-            diff(v,t) - 2*t + (1+t**2)*torch.sin(t) - u*v]
+    return [diff(u,t) - 3*(torch.cos(3*t) - u**2 - v + (1 + (3*t)**2 + torch.sin(3*t)**2)),
+            diff(v,t) - 3*(2*3*t + (1+(3*t)**2)*torch.sin(3*t) - u*v)]
     
 conditions = [IVP(t_0 = 0.0, u_0 = 0.0), IVP(t_0 = 0.0, u_0 = 1.0)]
 nets = [FCNN(n_hidden_units=10), FCNN(n_hidden_units=10)]
 params = set(chain.from_iterable(n.parameters() for n in nets))
 
-solver = Solver1D(ode_system, conditions, t_min=0.0, t_max=3.0, 
+solver = Solver1D(ode_system, conditions, t_min=0.0, t_max=1.0, 
                   nets=nets, optimizer = torch.optim.Adam(params, lr = 1e-2), 
                   criterion=torch.nn.MSELoss(), batch_size=30)
 solver.fit(max_epochs=10000)
 solution = solver.get_solution()
 
-t = np.linspace(0,3,30)
-sol1 = np.sin(t)
-sol2 = 1 + t**2
+t = np.linspace(0,1,30)
+sol1 = np.sin(3*t)
+sol2 = 1 + (3*t)**2
 u, v = solution(t, to_numpy=True)
 
 plt.plot(t, u, 'r-', label = "Neural Network 1 Output")

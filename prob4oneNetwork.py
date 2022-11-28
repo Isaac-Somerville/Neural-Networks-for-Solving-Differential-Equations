@@ -42,7 +42,7 @@ class DiffEq():
         
     def solution1(self, x):
         """Analytic solution to first DE"""
-        return torch.sin(x)
+        return torch.sin(3*x)
     
     def f1_trial(self, x, n1_out):
         """Trial solution f1(x) to first DE"""
@@ -54,7 +54,7 @@ class DiffEq():
     
     def solution2(self, x):
         """Analytic solution to second DE"""
-        return 1 + (x)**2
+        return 1 + (3*x)**2
     
     def f2_trial(self, x, n2_out):
         """Trial solution f2(x) to second DE"""
@@ -67,13 +67,13 @@ class DiffEq():
     def diffEq1(self, x, f1_trial, f2_trial, df1_trial):
         """Returns D1(x) where first DE is D1(x) = 0"""
         LHS = df1_trial
-        RHS = torch.cos(x) + (f1_trial)**2 + f2_trial - (1 + x**2 + (torch.sin(x))**2)
+        RHS = 3* (torch.cos(3*x) + (f1_trial)**2 + f2_trial - (1 + (3*x)**2 + (torch.sin(3*x))**2))
         return LHS - RHS
     
     def diffEq2(self, x, f1_trial, f2_trial, df2_trial):
         """Returns D2(x) where second DE is D2(x) = 0"""
         LHS = df2_trial
-        RHS = 2*x - ((1 + (x)**2)*torch.sin(x)) + (f1_trial*f2_trial)
+        RHS = 3*(2*3*x - ((1 + (3*x)**2)*torch.sin(3*x)) + (f1_trial*f2_trial))
         return LHS - RHS
 
 def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
@@ -148,7 +148,7 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations):
     plt.title("Network 2: " + str(epoch + iterations*epochs) + " Epochs")
     plt.show()
     
-xrange=[0, 3]
+xrange=[0, 1]
 num_samples = 30
 diffEq = DiffEq(xrange, num_samples)
 network     = Fitter(num_hidden_nodes=10)
