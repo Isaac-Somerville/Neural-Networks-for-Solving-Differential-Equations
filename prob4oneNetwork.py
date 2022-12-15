@@ -88,6 +88,7 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
         # loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=30, shuffle=True)
         for batch in loader:
             x = batch.view(-1, 1)
+            print(x)
             n1_out, n2_out = network(x)
 
             # Get the derivative of both networks' outputs with respect
