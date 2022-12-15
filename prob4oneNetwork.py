@@ -22,13 +22,13 @@ class Fitter(torch.nn.Module):
     def __init__(self, num_hidden_nodes):
         super(Fitter, self).__init__()
         self.fc1 = torch.nn.Linear(1, num_hidden_nodes)
-        self.fc2 = torch.nn.Linear(num_hidden_nodes, num_hidden_nodes)
-        self.fc3 = torch.nn.Linear(num_hidden_nodes, 2)
+        #self.fc2 = torch.nn.Linear(num_hidden_nodes, num_hidden_nodes)
+        self.fc2 = torch.nn.Linear(num_hidden_nodes, 2)
 
     def forward(self, x):
         hidden1 = torch.sigmoid(self.fc1(x))
-        hidden2 = torch.sigmoid(self.fc2(hidden1))
-        y = self.fc3(hidden2)
+        #hidden2 = torch.sigmoid(self.fc2(hidden1))
+        y = self.fc2(hidden1)
         y  = y.transpose(0,1)
         y1, y2 = y[0].view(-1,1), y[1].view(-1,1)
         return y1, y2
