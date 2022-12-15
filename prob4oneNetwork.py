@@ -154,11 +154,13 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange):
     plt.title("Network 2: " + str(epoch + iterations*epochs) + " Epochs")
     plt.show()
 
-network     = Fitter(num_hidden_nodes=10)
+network     = Fitter(num_hidden_nodes=32)
 loss_fn      = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 
-ranges = [[0.75,1.], [0.5,0.75], [0.25,0.5], [0., 0.25]]
+#ranges = [[0., 0.25], [0.25,0.5],[0.5,0.75], [0.75,1.], [0,1]]
+#ranges = [[0.75,1.],[0.5,0.75], [0.25,0.5],[0., 0.25],,[0,1]]
+ranges = [[0,0.5], [0.5,1.], [0,1]]
 for xrange in ranges:
     num_samples = 30
     diffEq = DiffEq(xrange, num_samples)
@@ -168,7 +170,7 @@ for xrange in ranges:
     losses = [1]
     iterations = 0
     epochs = 5000
-    while losses[-1] > 0.0001  and iterations < 20:
+    while losses[-1] > 0.001  and iterations < 10:
         newLoss = train(network, train_loader, loss_fn,
                             optimiser, diffEq, epochs, iterations)
         losses.extend(newLoss)
