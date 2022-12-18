@@ -43,5 +43,7 @@ ax.set_xlabel('x')
 ax.set_ylabel('y')
 ax.set_zlabel('z')
 ax.legend(loc = "lower center")
-ax.view_init(30, 315)
+#ax.view_init(30, 315)
 plt.show()
+
+#%% 
