@@ -3,6 +3,7 @@ import torch
 import torch.utils.data
 import numpy as np
 import matplotlib.pyplot as plt
+from torch.autograd import grad
 
 
 class DataSet(torch.utils.data.Dataset):
@@ -66,14 +67,14 @@ class DiffEq():
         return self.trial_term(x,y) + x*(1-x)*y*(1-y)*n_out
     
     def diffEq(self,x,y,trial):
-        trial_dx = torch.autograd.grad(trial, x, torch.ones_like(trial), retain_graph=True, create_graph=True)[0]
-        trial_dx2 = torch.autograd.grad(trial_dx, x, torch.ones_like(trial_dx), retain_graph=True, create_graph=True)[0]
-        trial_dy = torch.autograd.grad(trial, y, torch.ones_like(trial), retain_graph=True, create_graph=True)[0]
-        trial_dy2 = torch.autograd.grad(trial_dy, y, torch.ones_like(trial_dy), retain_graph=True, create_graph=True)[0]
-        print(trial_dx)
-        print(trial_dx2)
-        print(trial_dy)
-        print(trial_dy2)
+        trial_dx = grad(trial, x, torch.ones_like(trial), retain_graph=True, create_graph=True)[0]
+        trial_dx2 = grad(trial_dx, x, torch.ones_like(trial_dx), retain_graph=True, create_graph=True)[0]
+        trial_dy = grad(trial, y, torch.ones_like(trial), retain_graph=True, create_graph=True)[0]
+        trial_dy2 = grad(trial_dy, y, torch.ones_like(trial_dy), retain_graph=True, create_graph=True)[0]
+        # print(trial_dx)
+        # print(trial_dx2)
+        # print(trial_dy)
+        # print(trial_dy2)
         RHS = torch.exp(-x) * (x - 2 + y**3 + 6*y)
         return trial_dx2 + trial_dy2 - RHS
 
@@ -149,34 +150,40 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     #ax.view_init(10, 270)
     plt.show()
 
-
-num_samples = 8
-xrange = [0,1]
-yrange = [0,1]
-diffEq = DiffEq(xrange, yrange, num_samples)
-
 network     = Fitter(num_hidden_nodes=8)
 loss_fn      = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
-train_set    = DataSet(xrange,yrange,num_samples)
-train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=10, shuffle=True)
 
-losses = [1]
-iterations = 0
-epochs = 5000
-while losses[-1] > 0.001  and iterations < 10:
-    newLoss = train(network, train_loader, loss_fn,
-                        optimiser, diffEq, epochs, iterations)
-    losses.extend(newLoss)
-    iterations += 1
-losses = losses[1:]
-print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+# j = 4
+# ranges = []
+# for i in range(j):
+#     lst = [i/j, (i+1)/j]
+#     ranges.append(lst)
+# ranges.append([0,1])
+ranges = [[0,1]]
+for xrange in ranges:
+    yrange = xrange
+    num_samples = 8
+    diffEq = DiffEq(xrange, yrange, num_samples)
+    train_set    = DataSet(xrange,yrange,num_samples)
+    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=8, shuffle=True)  
 
-plt.semilogy(losses)
-plt.xlabel("Epochs")
-plt.ylabel("Log of Loss")
-plt.title("Loss")
-plt.show()
+    losses = [1]
+    iterations = 0
+    epochs = 5000
+    while losses[-1] > 0.001  and iterations < 10:
+        newLoss = train(network, train_loader, loss_fn,
+                            optimiser, diffEq, epochs, iterations)
+        losses.extend(newLoss)
+        iterations += 1
+    losses = losses[1:]
+    print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+
+    plt.semilogy(losses)
+    plt.xlabel("Epochs")
+    plt.ylabel("Log of Loss")
+    plt.title("Loss")
+    plt.show()
 
 plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
 
