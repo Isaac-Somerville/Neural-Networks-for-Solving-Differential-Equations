@@ -66,23 +66,23 @@ class DiffEq():
         return (-torch.exp(-x) * (x+y-1) - y**3 + (y**2 +3) * y * np.exp(-1) + y
                 + y*(1-y)* ((1-2*x) * n_out + x*(1-x)*dndx))
 
-    def dx2_trial(self,batch,n_out,dndx,dndx2):
-        return (torch.exp(-batch[:,0]) * (batch[:,0]+batch[:,1]-2)
-                + batch[:,1]*(1-batch[:,1])* ((-2*n_out) + 2*(1-2*batch[:,0])*dndx) + batch[:,0]*(1-batch[:,0])*dndx2)
+    def dx2_trial(self,x,y,n_out,dndx,dndx2):
+        return (torch.exp(-x) * (x+y-2)
+                + y*(1-y)* ((-2*n_out) + 2*(1-2*x)*dndx) + x*(1-x)*dndx2)
 
     def dy_trial(self,x,y,n_out, dndy):
         return (3*x*(y**2 +1) *np.exp(-1) - (x-1)*(3*(y**2)-1) + torch.exp(-x)
                 + x*(1-x)* ((1-2*y) * n_out + y*(1-y)*dndy) )
 
-    def dy2_trial(self,batch,n_out,dndy,dndy2):
-        return (np.exp(-1) * 6 * batch[:,1] * (-np.exp(1)*batch[:,0] + batch[:,0] + np.exp(1))
-                + batch[:,0]*(1-batch[:,0])* ((-2*n_out) + 2*(1-2*batch[:,1])*dndy) + batch[:,1]*(1-batch[:,1])*dndy2)
+    def dy2_trial(self,x,y,n_out,dndy,dndy2):
+        return (np.exp(-1) * 6 * y * (-np.exp(1)*x + x + np.exp(1))
+                + x*(1-x)* ((-2*n_out) + 2*(1-2*y)*dndy) + y*(1-y)*dndy2)
     
     def trial(self,x,y,n_out):
         return self.trial_term(x,y) + x*(1-x)*y*(1-y)*n_out
     
-    def diffEq(self,batch,trial_dx2,trial_dy2):
-        RHS = torch.exp(-batch[:,0]) * (batch[:,0] - 2 + batch[:,1]**3 + 6*batch[:,1])
+    def diffEq(self,x,y,trial_dx2,trial_dy2):
+        RHS = torch.exp(-x) * (x - 2 + y**3 + 6*y)
         return trial_dx2 + trial_dy2 - RHS
 
 
@@ -92,27 +92,32 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     network.train(True)
     for epoch in range(epochs+1):
         for batch in loader:
-            n_out = network(batch)
+            n_out = network(batch).view(-1,1)
+            #print(n_out)
             # print(batch)
             # print(x)
             # print(y)
             dn = torch.autograd.grad(n_out, batch, torch.ones_like(n_out), retain_graph=True, create_graph=True)[0]
+            #print(dn)
             dn2 = torch.autograd.grad(dn, batch, torch.ones_like(dn), retain_graph=True, create_graph=True)[0]
-            # print(dn)
-            # print(dn2)
+            #print(dn2)
             dndx, dndy = dn[:,0].view(-1,1), dn[:,1].view(-1,1)
+            # print(dndx)
+            # print(dndy)
             dndx2, dndy2 = dn2[:,0].view(-1,1), dn2[:,1].view(-1,1)
+            # print(dndx2)
+            # print(dndy2)
             # dndx2 = torch.autograd.grad(dndx, x, torch.ones_like(dndx), retain_graph=True, create_graph=True)[0]
             # dndy = torch.autograd.grad(n_out, y, torch.ones_like(n_out), retain_graph=True, create_graph=True)[0]
             # dndy2 = torch.autograd.grad(dndy, y, torch.ones_like(dndy), retain_graph=True, create_graph=True)[0]
 
-            #x, y = batch[:,0].view(-1,1), batch[:,1].view(-1,1)
+            x, y = batch[:,0].view(-1,1), batch[:,1].view(-1,1)
             # Get value of trial solution f_{xx}(x,y) and f_{yy}(x,y)
-            trial_dx2 = diffEq.dx2_trial(batch,n_out,dndx,dndx2)
-            trial_dy2 = diffEq.dy2_trial(batch,n_out,dndy,dndy2)
+            trial_dx2 = diffEq.dx2_trial(x,y,n_out,dndx,dndx2)
+            trial_dy2 = diffEq.dy2_trial(x,y,n_out,dndy,dndy2)
     
             # Get value of diff equations D(x) = 0
-            D = diffEq.diffEq(batch, trial_dx2, trial_dy2)
+            D = diffEq.diffEq(x,y, trial_dx2, trial_dy2)
 
             # Calculate and store loss
             loss = loss_fn(D, torch.zeros_like(D))
@@ -167,12 +172,12 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     plt.show()
 
 
-num_samples = 10
+num_samples = 8
 xrange = [0,1]
 yrange = [0,1]
 diffEq = DiffEq(xrange, yrange, num_samples)
 
-network     = Fitter(num_hidden_nodes=10)
+network     = Fitter(num_hidden_nodes=8)
 loss_fn      = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 train_set    = DataSet(xrange,yrange,num_samples)
