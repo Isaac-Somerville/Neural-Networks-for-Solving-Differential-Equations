@@ -5,23 +5,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.autograd import grad
 
+# maybe jacobian instead?
 
 class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x- and y-coordinates as test data"""
     def __init__(self, xrange, yrange, num_samples):
-        # self.data_in  = torch.rand(num_samples, requires_grad=True)
         X  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True)
         Y  = torch.linspace(yrange[0],yrange[1],num_samples, requires_grad=True)
-        grid = torch.meshgrid(X,Y)
-        # print(grid)
-        # print(grid[0].reshape(-1,1))
-        # print(grid[1].reshape(-1,1))
-        self.data_in = torch.cat((grid[0].reshape(-1,1),grid[1].reshape(-1,1)),1)
-        #print(self.data_in.shape)
-        #tensor_data = torch.tensor(data, requires_grad=True)
-        #self.data_in = tensor_data.view(-1,2)
-        # self.data_in = torch.meshgrid(X,Y)
-        # print(self.data_in.shape)
+        # create tuple of (num_samples x num_samples) points
+        x,y = torch.meshgrid(X,Y) 
+
+        # input of forward function must have shape (batch_size, 2)
+        self.data_in = torch.cat((x.reshape(-1,1),y.reshape(-1,1)),1)
 
     def __len__(self):
         return self.data_in.shape[0]
@@ -55,26 +50,18 @@ class DiffEq():
     def solution(self,x,y):
         return torch.exp(-x) * (x + y**3)
 
-    def trial_term(self,x,y):
-        """
-        First term in trial solution that helps to satisfy BCs
-        """
-        e_inv = np.exp(-1)
-        return ((1-x)*(y**3) + x*(1+(y**3))*e_inv + (1-y)*x*(torch.exp(-x)-e_inv) +
-                y * ((1+x)*torch.exp(-x) - (1-x-(2*x*e_inv))))
-    
     def trial(self,x,y,n_out):
-        return self.trial_term(x,y) + x*(1-x)*y*(1-y)*n_out
+        # trial_term guarantees to satisfy boundary conditions
+        e_inv = torch.exp(-torch.ones_like(x))
+        trial_term = (((1-x)*(y**3)) + (x*(1+(y**3))*e_inv) + ((1-y)*x*(torch.exp(-x)-e_inv)) +
+                (y * (((1+x)*torch.exp(-x)) - (1-x+(2*x*e_inv)))))
+        return (trial_term + x*(1-x)*y*(1-y)*n_out)
     
     def diffEq(self,x,y,trial):
-        trial_dx = grad(trial, x, torch.ones_like(trial), retain_graph=True, create_graph=True)[0]
-        trial_dx2 = grad(trial_dx, x, torch.ones_like(trial_dx), retain_graph=True, create_graph=True)[0]
-        trial_dy = grad(trial, y, torch.ones_like(trial), retain_graph=True, create_graph=True)[0]
-        trial_dy2 = grad(trial_dy, y, torch.ones_like(trial_dy), retain_graph=True, create_graph=True)[0]
-        # print(trial_dx)
-        # print(trial_dx2)
-        # print(trial_dy)
-        # print(trial_dy2)
+        trial_dx = grad(trial, x, torch.ones_like(trial), create_graph=True)[0]
+        trial_dx2 = grad(trial_dx, x, torch.ones_like(trial_dx), create_graph=True)[0]
+        trial_dy = grad(trial, y, torch.ones_like(trial), create_graph=True)[0]
+        trial_dy2 = grad(trial_dy, y, torch.ones_like(trial_dy),create_graph=True)[0]
         RHS = torch.exp(-x) * (x - 2 + y**3 + 6*y)
         return trial_dx2 + trial_dy2 - RHS
 
@@ -85,32 +72,29 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     network.train(True)
     for epoch in range(epochs+1):
         for batch in loader:
-            #print(batch)
             n_out = network(batch).view(-1,1)
-            #rint(n_out)
             x, y = batch[:,0].view(-1,1), batch[:,1].view(-1,1)
-            #print(x)
-            #print(y)
 
-            # Get value of trial solution f(x)
+            # Get value of trial solution f(x,y)
             trial = diffEq.trial(x,y,n_out)
     
-            # Get value of diff equations D(x) = 0
+            # Get value of diff equations D(x,y) = 0
             D = diffEq.diffEq(x, y, trial)
 
             # Calculate and store loss
             loss = loss_fn(D, torch.zeros_like(D))
-            cost_list.append(loss.detach().numpy())
-        
+
             # Optimization algorithm
             loss.backward()
             optimiser.step()
             optimiser.zero_grad()
             
         if epoch%(epochs/5)==0:
-        #if epoch == epochs:
             plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
-        
+            
+        #store final loss of each epoch
+        cost_list.append(loss.detach().numpy())
+    
     network.train(False)
     return cost_list
 
@@ -123,34 +107,27 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     Y  = torch.linspace(yrange[0],yrange[1],num_samples, requires_grad=True)
     x,y = torch.meshgrid(X,Y)
     input = torch.cat((x.reshape(-1,1),y.reshape(-1,1)),1)
-    # print(x.reshape(-1,1))
-    # print(y.reshape(-1,1))
-    #data = [[[x,y] for y in Y] for x in X]
-    #input = torch.tensor(data, requires_grad=True).view(-1,2)
-    #print(input)
     N = network.forward(input)
-    # print(N)
-    N = N.reshape(num_samples,num_samples).detach().numpy()
-    # print(x)
-    # print(y)s
-    # print(N)
+    trial = diffEq.trial(x.reshape(-1,1),y.reshape(-1,1),N)
+    trial = trial.reshape(num_samples,num_samples).detach().numpy()
 
     exact = diffEq.solution(x,y).detach().numpy()
     x = x.detach().numpy()
     y = y.detach().numpy()
     ax = plt.axes(projection='3d')
-    ax.plot_surface(x,y,N,rstride=1, cstride=1,
-                cmap='plasma', edgecolor='none')
+    surf = ax.plot_surface(x,y,trial, rstride=1, cstride=1,
+                cmap='plasma', edgecolors = 'none')
+    # surf._facecolors2d = surf._facecolor3d
+    # surf._edgecolors2d = surf._edgecolor3d
+    # plt.colorbar(surf, location = 'left')
     ax.scatter(x,y,exact, label = 'Exact Solution')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
-    ax.set_zlabel('z')
     ax.legend()
     ax.set_title(str(epoch + iterations*epochs) + " Epochs")
-    #ax.view_init(10, 270)
     plt.show()
 
-network     = Fitter(num_hidden_nodes=8)
+network     = Fitter(num_hidden_nodes=10)
 loss_fn      = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 
@@ -163,11 +140,11 @@ optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 ranges = [[0,1]]
 for xrange in ranges:
     yrange = xrange
-    num_samples = 8
+    num_samples = 10
     diffEq = DiffEq(xrange, yrange, num_samples)
     train_set    = DataSet(xrange,yrange,num_samples)
-    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=8, shuffle=True)  
-
+    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=32, shuffle=True) 
+ 
     losses = [1]
     iterations = 0
     epochs = 5000
@@ -188,29 +165,3 @@ for xrange in ranges:
 plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
 
 #%%
-
-
-
-
-
-
-# # Plot for a three-dimensional surface
-# x = np.linspace(0,1,20)
-# y = np.linspace(0,1,20)
-# X,Y = np.meshgrid(x,y)
-# Z = np.exp(-X) * (X+Y**3)
-# ax = plt.axes(projection='3d')
-# ax.plot_surface(X, Y, Z, rstride=1, cstride=1,
-#                 cmap='plasma', edgecolor='none')
-
-# ax.set_xlabel('x')
-# ax.set_ylabel('y')
-# ax.set_zlabel('z')
-# ax.view_init(30, 315)
-
-
-# Data for three-dimensional scattered points
-# zdata = 15 * np.random.random(100)
-# xdata = np.sin(zdata) + 0.1 * np.random.randn(100)
-# ydata = np.cos(zdata) + 0.1 * np.random.randn(100)
-# ax.scatter3D(xdata, ydata, zdata, c=zdata, cmap='Greens')
