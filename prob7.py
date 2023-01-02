@@ -136,7 +136,7 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
 
             # Calculate and store loss
             loss = loss_fn(D, torch.zeros_like(D))
-            cost_list.append(loss.detach().numpy())
+            
         
             # Optimization algorithm
             loss.backward()
@@ -146,6 +146,7 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
         if epoch%(epochs/5)==0:
         #if epoch == epochs:
             plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
+        cost_list.append(loss.detach().numpy())
 
     network.train(False)
     return cost_list
@@ -156,20 +157,47 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     Plots the outputs of both neural networks, along with the
     analytic solution in the same range
     """
-    X  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True)
-    Y  = torch.linspace(yrange[0],yrange[1],num_samples, requires_grad=True)
-    x,y = torch.meshgrid(X,Y)
-    input = torch.cat((x.reshape(-1,1),y.reshape(-1,1)),1)
-    N = network.forward(input)
-    N = N.reshape(num_samples,num_samples).detach().numpy()
+    x_lin  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True)
+    y_lin  = torch.linspace(yrange[0],yrange[1],num_samples, requires_grad=True)
+    X,Y = torch.meshgrid(x_lin,y_lin)
+    x, y  = X.reshape(-1,1), Y.reshape(-1,1)
+    xy = torch.cat((x,y),1)
+    n_xy = network.forward(xy).view(-1,1)
 
+    y1 = torch.ones_like(y)
+    # print(y)
+    # print(y1)
+    xy1 = torch.cat((x,y1),1)
+    # print(xy1)
+    # print(n_xy)
+    n_x1 = network(xy1).view(-1,1)
+    # print(n_x1)
+
+    dn = torch.autograd.grad(n_xy, xy, torch.ones_like(n_xy), retain_graph=True, create_graph=True)[0]
+    dn2 = torch.autograd.grad(dn, xy, torch.ones_like(dn), retain_graph=True, create_graph=True)[0]
+    dndx, dndy = dn[:,0].view(-1,1), dn[:,1].view(-1,1)
+    dndx2, dndy2 = dn2[:,0].view(-1,1), dn[:,1].view(-1,1)
+
+    dn_x1 = torch.autograd.grad(n_x1, xy1, torch.ones_like(n_x1), retain_graph=True, create_graph=True)[0]
+    dn2_x1 = torch.autograd.grad(dn_x1, xy1, torch.ones_like(dn_x1), retain_graph=True, create_graph=True)[0]
+    # print(dn_x1)
+    dndx_x1, dndy_x1 = dn_x1[:,0].view(-1,1), dn_x1[:,1].view(-1,1)
+    dndx2_x1, dndy2_x1 = dn2_x1[:,0].view(-1,1), dn2_x1[:,1].view(-1,1)
+    # print(dndy_x1)
+
+    dndydx_x1 = torch.autograd.grad(dndy_x1, x, torch.ones_like(dndy_x1), retain_graph=True, create_graph=True)[0]
+    dndydx2_x1 = torch.autograd.grad(dndydx_x1, x, torch.ones_like(dndydx_x1), retain_graph=True, create_graph=True)[0]
+
+    trial = diffEq.trial(x,y,n_xy,n_x1,dndy_x1)
+    trial = trial.reshape(num_samples,num_samples).detach().numpy()
     exact = diffEq.solution(x,y).detach().numpy()
-    x = x.detach().numpy()
-    y = y.detach().numpy()
+
+    X = X.detach().numpy()
+    Y = Y.detach().numpy()
     ax = plt.axes(projection='3d')
-    ax.plot_surface(x,y,N,rstride=1, cstride=1,
+    ax.plot_surface(X,Y,trial,rstride=1, cstride=1,
                 cmap='plasma', edgecolor='none')
-    ax.scatter(x,y,exact, label = 'Exact Solution')
+    ax.scatter(X,Y,exact, label = 'Exact Solution')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
@@ -178,21 +206,21 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     plt.show()
 
 
-num_samples = 8
+num_samples = 10
 xrange = [0,1]
 yrange = [0,1]
 diffEq = DiffEq(xrange, yrange, num_samples)
 
-network     = Fitter(num_hidden_nodes=8)
+network     = Fitter(num_hidden_nodes=10)
 loss_fn      = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 train_set    = DataSet(xrange,yrange,num_samples)
-train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=10, shuffle=True)
+train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=50, shuffle=True)
 
 losses = [1]
 iterations = 0
 epochs = 5000
-while losses[-1] > 0.001  and iterations < 10:
+while losses[-1] > 0.0001  and iterations < 10:
     newLoss = train(network, train_loader, loss_fn,
                         optimiser, diffEq, epochs, iterations)
     losses.extend(newLoss)
@@ -207,3 +235,5 @@ plt.title("Loss")
 plt.show()
 
 plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
+
+#%%
