@@ -44,7 +44,7 @@ class DiffEq():
         self.num_samples = num_samples
 
     def solution(self, x, y):
-        return (y**2) * torch.sin(torch.pi * x)
+        return (y**2) * torch.sin(np.pi * x)
 
     def trial_term(self,x,y):
         """
@@ -52,7 +52,7 @@ class DiffEq():
         f(0,y) = 0, f(1,y) = 0, f(x,0) = 0, f_{y}(x,1) = 2*sin(pi*x)
         B(x,y) = y * 2 * sin(pi*x)
         """
-        return 2 * y * torch.sin(torch.pi * x)
+        return 2 * y * torch.sin(np.pi * x)
 
     def trial(self,x,y,n_xy,n_x1,dndy_x1):
         return self.trial_term(x,y) + x*(1-x)*y*(n_xy - n_x1 - dndy_x1)
@@ -63,7 +63,7 @@ class DiffEq():
                     y * [(1-2*x)(N - N(x,1) - N_{y}(x,1)) 
                         + x(1-x)(N_{x} - N_{x}(x,1) - N_{xy}(x,1)]
         """
-        return ( 2* y *torch.pi * torch.cos(torch.pi*x) 
+        return ( 2* y *np.pi * torch.cos(np.pi*x) 
                 + y * ((1-2*x) * (n_xy - n_x1 - dndy_x1)
                     + x*(1-x)*(dndx - dndx_x1 - dndydx_x1)))
 
@@ -73,7 +73,7 @@ class DiffEq():
                     + y * [ (-2)*(N - N(x,1) - N_{y}(x,1)
                             + 2(1-2x)((N_{x} - N_{x}(x,1) - N_{xy}(x,1))
                             + x(1-x)(N_{xx} - N_{xx}(x,1) - N_{xxy}(x,1))]"""
-        return ( -2* y *(torch.pi)**2 * torch.sin(torch.pi*x) 
+        return ( -2* y *(np.pi)**2 * torch.sin(np.pi*x) 
                 + y * ( (-2) * (n_xy - n_x1 - dndy_x1)
                     + 2*(1-2*x) * (dndx - dndx_x1 - dndydx_x1)
                     + x*(1-x)*(dndx2 - dndx2_x1 - dndydx2_x1)))
@@ -83,7 +83,7 @@ class DiffEq():
         df / dy = 2sin(pi*x) + x(1-x)[(N - N(x,1) - N_{y}(x,1))
                                     + y * N_{y}]
         """
-        return (2*torch.sin(torch.pi *x) + x*(1-x) *
+        return (2*torch.sin(np.pi *x) + x*(1-x) *
             ((n_xy - n_x1 - dndy_x1) + (y* dndy)))
 
     def dy2_trial(self,x,y,dndy,dndy2):
@@ -93,7 +93,7 @@ class DiffEq():
         return (x * (1-x) * (2 * dndy + y * dndy2))
 
     def diffEq(self,x,y,trial_dx2,trial_dy2):
-        RHS = (2-((torch.pi*y)**2)) * torch.sin(torch.pi * x)
+        RHS = (2-((np.pi*y)**2)) * torch.sin(np.pi * x)
         return trial_dx2 + trial_dy2 - RHS
 
 
@@ -189,8 +189,11 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     dndydx2_x1 = torch.autograd.grad(dndydx_x1, x, torch.ones_like(dndydx_x1), retain_graph=True, create_graph=True)[0]
 
     trial = diffEq.trial(x,y,n_xy,n_x1,dndy_x1)
-    trial = trial.reshape(num_samples,num_samples).detach().numpy()
     exact = diffEq.solution(x,y).detach().numpy()
+    trial = trial.detach().numpy()
+    print("mean square difference between trial and exact solution = ", ((trial-exact)**2).mean())
+
+    trial = trial.reshape(num_samples,num_samples)
 
     X = X.detach().numpy()
     Y = Y.detach().numpy()

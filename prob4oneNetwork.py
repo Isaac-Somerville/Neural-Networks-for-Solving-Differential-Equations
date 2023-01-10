@@ -160,7 +160,8 @@ optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 
 #ranges = [[0., 0.25], [0.25,0.5],[0.5,0.75], [0.75,1.], [0,1]]
 #ranges = [[0.75,1.],[0.5,0.75], [0.25,0.5],[0., 0.25],,[0,1]]
-ranges = [[0,0.5], [0.5,1.], [0,1]]
+# ranges = [[0,0.5], [0.5,1.], [0,1]]
+ranges = [[0,0.5],[0,1]]
 allLosses = []
 totalEpochs = 0
 for i in range(len(ranges)):

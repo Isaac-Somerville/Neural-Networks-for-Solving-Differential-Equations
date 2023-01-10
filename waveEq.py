@@ -54,30 +54,33 @@ class DiffEq():
     def integrate(self,func,n, num_points):
         x = torch.linspace(0,self.L,num_points)
         y = func(x,n)
-        return torch.trapezoid(y)
+        return torch.trapz(y)
 
     def f(self,x):
         """f(x) = u(x,0)"""
-        return 2*torch.sin(x * torch.pi / self.L)
+        return 2*torch.sin(x * np.pi / self.L)
     
     def f_helper(self,x,n):
-        return self.f(x) * torch.sin(n*torch.pi*x / self.L)
+        return self.f(x) * torch.sin(n*np.pi*x / self.L)
 
     def g(self,x):
         """g(x) = u_{t}(x,0)"""
         return 0
 
     def g_helper(self,x,n):
-        return self.g(x) * torch.sin(n*torch.pi*x / self.L)
+        return self.g(x) * torch.sin(n*np.pi*x / self.L)
 
 
     def solution(self,x,t):
         N = 10
         A = torch.tensor([(2/self.L) * self.integrate(self.f_helper,n,100) for n in range(1,N+1)])
         B = torch.tensor([(2/self.L) * self.integrate(self.g_helper,n,100) for n in range(1,N+1)])
-        sin_t = torch.tensor([[self.L * torch.sin(n*self.v*torch.pi*t/(self.L)) / (n*torch.pi*self.v)] for n in range(1,N+1)])
-        cos_t = torch.tensor([torch.cos(n*self.v*torch.pi*t/(self.L)) for n in range(1,N+1)])
-        sin_x = torch.tensor([torch.sin(n*torch.pi*x/(self.L)) for n in range(1,N+1)])
+        print(self.v)
+        print(self.L)
+        print(torch.sin(self.v*np.pi*t/(self.L)))
+        sin_t = torch.tensor([self.L * torch.sin(n*self.v*np.pi*t/(self.L)) / (n*np.pi*self.v) for n in range(1,N+1)])
+        cos_t = torch.tensor([torch.cos(n*self.v*np.pi*t/(self.L)) for n in range(1,N+1)])
+        sin_x = torch.tensor([torch.sin(n*np.pi*x/(self.L)) for n in range(1,N+1)])
         return torch.sum((A * sin_t + B*cos_t) * sin_x)
 
     def trial(self,x,t,n_out):

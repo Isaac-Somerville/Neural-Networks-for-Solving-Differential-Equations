@@ -158,6 +158,8 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     # print(N)
 
     exact = diffEq.solution(x,y).detach().numpy()
+    print("mean square difference between trial and exact solution = ", ((output-exact)**2).mean()) 
+
     x = x.detach().numpy()
     y = y.detach().numpy()
     ax = plt.axes(projection='3d')
@@ -173,12 +175,12 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     plt.show()
 
 
-num_samples = 8
+num_samples = 10
 xrange = [0,1]
 yrange = [0,1]
 diffEq = DiffEq(xrange, yrange, num_samples)
 
-network     = Fitter(num_hidden_nodes=8)
+network     = Fitter(num_hidden_nodes=10)
 loss_fn      = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 train_set    = DataSet(xrange,yrange,num_samples)

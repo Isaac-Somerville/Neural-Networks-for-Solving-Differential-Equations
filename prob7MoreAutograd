@@ -60,11 +60,11 @@ class DiffEq():
         self.num_samples = num_samples
 
     def solution(self,x,y):
-        return y**2 * torch.sin(torch.pi * x)
+        return y**2 * torch.sin(np.pi * x)
 
     def trial(self,x,y,n_xy, n_xy1, dy_n_xy1):
         # trial_term guarantees to satisfy boundary conditions
-        trial_term = y * 2 * torch.sin(torch.pi * x)
+        trial_term = y * 2 * torch.sin(np.pi * x)
         return (trial_term + x*(1-x)*y*(n_xy - n_xy1 - dy_n_xy1))
 
     def diffEq(self,x,y,trial):
@@ -76,7 +76,7 @@ class DiffEq():
         if dy2_trial == None:
             dy2_trial = torch.zeros_like(dy_trial, requires_grad=True)
         #print(dy2_trial)
-        RHS = (2 - (torch.pi*y)**2) * torch.sin(torch.pi * x)
+        RHS = (2 - (np.pi*y)**2) * torch.sin(np.pi * x)
         return dx2_trial + dy2_trial - RHS
 
 def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
@@ -136,9 +136,12 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     d_n_xy1 = grad(n_xy1, xy1, torch.ones_like(n_xy1),create_graph=True)[0]
     dy_n_xy1 = d_n_xy1[:,1].view(-1,1)
 
-    trial = diffEq.trial(x,y,n_xy, n_xy1, dy_n_xy1)
-    trial = trial.reshape(num_samples,num_samples).detach().numpy()
+    trial = diffEq.trial(x,y,n_xy,n_xy1,dy_n_xy1)
     exact = diffEq.solution(x,y).detach().numpy()
+    trial = trial.detach().numpy()
+    print("mean square difference between trial and exact solution = ", ((trial-exact)**2).sum())
+
+    trial = trial.reshape(num_samples,num_samples)
 
     X = X.detach().numpy()
     Y = Y.detach().numpy()

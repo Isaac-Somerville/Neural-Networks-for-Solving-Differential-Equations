@@ -87,7 +87,8 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
             optimiser.step()
             optimiser.zero_grad()
             
-        if epoch%(epochs/5)==0:
+        # if epoch%(epochs/5)==0:
+        if epoch == epochs:
             plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
             
         #store final loss of each epoch
@@ -106,10 +107,12 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     x,y = torch.meshgrid(X,Y)
     input = torch.cat((x.reshape(-1,1),y.reshape(-1,1)),1)
     N = network.forward(input)
+
     trial = diffEq.trial(x.reshape(-1,1),y.reshape(-1,1),N)
     trial = trial.reshape(num_samples,num_samples).detach().numpy()
-
     exact = diffEq.solution(x,y).detach().numpy()
+    surfaceLoss = ((trial-exact)**2).mean()
+    
     x = x.detach().numpy()
     y = y.detach().numpy()
     ax = plt.axes(projection='3d')
@@ -124,10 +127,13 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     ax.legend()
     ax.set_title(str(epoch + iterations*epochs) + " Epochs")
     plt.show()
+    return surfaceLoss
 
-network     = Fitter(num_hidden_nodes=10)
-loss_fn      = torch.nn.MSELoss()
-optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
+# network     = Fitter(num_hidden_nodes=10)
+# loss_fn      = torch.nn.MSELoss()
+#optimiser  = torch.optim.Adam(network.parameters(), lr = 5e-3)
+
+# check final loss for different lrs, fixed no. of epochs
 
 # j = 4
 # ranges = []
@@ -136,30 +142,50 @@ optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 #     ranges.append(lst)
 # ranges.append([0,1])
 ranges = [[0,1]]
+lrs = [(1e-2 + i * 4e-4) for i in range(10)]
+# lrs = [(5e-3 + i * 1e-3) for i in range(1,11)]
+# lrs = [(i * 1e-3) for i in range(1,11)]
+finalLosses = []
+surfaceLosses = []
 for xrange in ranges:
-    yrange = xrange
-    num_samples = 10
-    diffEq = DiffEq(xrange, yrange, num_samples)
-    train_set    = DataSet(xrange,yrange,num_samples)
-    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=32, shuffle=True) 
- 
-    losses = [1]
-    iterations = 0
-    epochs = 5000
-    while losses[-1] > 0.001  and iterations < 10:
-        newLoss = train(network, train_loader, loss_fn,
-                            optimiser, diffEq, epochs, iterations)
-        losses.extend(newLoss)
-        iterations += 1
-    losses = losses[1:]
-    print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+    for lr in lrs:
+        network     = Fitter(num_hidden_nodes=8)
+        loss_fn      = torch.nn.MSELoss()
+        optimiser  = torch.optim.Adam(network.parameters(), lr = lr)
+        yrange = xrange
+        num_samples = 8
+        diffEq = DiffEq(xrange, yrange, num_samples)
+        train_set    = DataSet(xrange,yrange,num_samples)
+        train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=32, shuffle=True) 
+    
+        losses = [1]
+        iterations = 0
+        epochs = 5000
+        while losses[-1] > 0.001  and iterations < 1:
+            newLoss = train(network, train_loader, loss_fn,
+                                optimiser, diffEq, epochs, iterations)
+            losses.extend(newLoss)
+            iterations += 1
+        losses = losses[1:]
+        finalLoss = losses[-1]
+        finalLosses.append(finalLoss)
+        print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
 
-    plt.semilogy(losses)
-    plt.xlabel("Epochs")
-    plt.ylabel("Log of Loss")
-    plt.title("Loss")
-    plt.show()
+        plt.semilogy(losses)
+        plt.xlabel("Epochs")
+        plt.ylabel("Log of Loss")
+        plt.title("Loss")
+        plt.show()
+
+        surfaceLoss = plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
+        surfaceLosses.append(surfaceLoss)
 
 plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
+plt.show()
+plt.semilogy(lrs,surfaceLosses)
+plt.xlabel("Learning Rate")
+plt.ylabel("Mean Squared Error ")
+plt.title("Mean Squared Error of Network from Exact Solution")
+
 
 #%%
