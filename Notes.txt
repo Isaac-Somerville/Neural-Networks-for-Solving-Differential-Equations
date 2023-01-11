@@ -1,0 +1,8 @@
+Notes
+
+Scope of project
+3 body problem, using a GPU?
+prob 7, loss and MSE differences
+
+Dear Kasper,
+

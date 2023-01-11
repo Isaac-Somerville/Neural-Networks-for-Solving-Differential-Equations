@@ -143,9 +143,9 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
             optimiser.step()
             optimiser.zero_grad()
 
-        if epoch%(epochs/5)==0:
-        #if epoch == epochs:
-            plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
+        # if epoch%(epochs/5)==0:
+        # if epoch == epochs:
+        #     plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
         cost_list.append(loss.detach().numpy())
 
     network.train(False)
@@ -191,7 +191,8 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     trial = diffEq.trial(x,y,n_xy,n_x1,dndy_x1)
     exact = diffEq.solution(x,y).detach().numpy()
     trial = trial.detach().numpy()
-    print("mean square difference between trial and exact solution = ", ((trial-exact)**2).mean())
+    surfaceLoss = ((trial-exact)**2).mean()
+    print("mean square difference between trial and exact solution = ", surfaceLoss)
 
     trial = trial.reshape(num_samples,num_samples)
 
@@ -208,35 +209,61 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     ax.set_title(str(epoch + iterations*epochs) + " Epochs")
     plt.show()
 
+    return surfaceLoss
+
 
 num_samples = 10
 xrange = [0,1]
 yrange = [0,1]
-diffEq = DiffEq(xrange, yrange, num_samples)
 
-network     = Fitter(num_hidden_nodes=10)
-loss_fn      = torch.nn.MSELoss()
-optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
-train_set    = DataSet(xrange,yrange,num_samples)
-train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=50, shuffle=True)
-
-losses = [1]
-iterations = 0
 epochs = 5000
-while losses[-1] > 0.0001  and iterations < 10:
-    newLoss = train(network, train_loader, loss_fn,
-                        optimiser, diffEq, epochs, iterations)
-    losses.extend(newLoss)
-    iterations += 1
-losses = losses[1:]
-print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+lrs = [(7e-3 + i * 1e-4) for i in range(11)]
+# lrs = [(4e-3 + i * 5e-4) for i in range(1,11)]
+# lrs = [(i * 1e-3) for i in range(1,11)]
+finalLosses = []
+surfaceLosses = []
+for lr in lrs:
+    losses = [1]
+    iterations = 0
+    network     = Fitter(num_hidden_nodes=10)
+    loss_fn      = torch.nn.MSELoss()
+    optimiser  = torch.optim.Adam(network.parameters(), lr = lr)
+    train_set    = DataSet(xrange,yrange,num_samples)
+    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=50, shuffle=True)
+    diffEq = DiffEq(xrange, yrange, num_samples)
+    while losses[-1] > 0.001  and iterations < 2:
+        newLoss = train(network, train_loader, loss_fn,
+                            optimiser, diffEq, epochs, iterations)
+        losses.extend(newLoss)
+        iterations += 1
+    losses = losses[1:]
+    finalLoss = losses[-1]
+    finalLosses.append(finalLoss)
+    print("lr = ", lr)
+    print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
 
-plt.semilogy(losses)
-plt.xlabel("Epochs")
-plt.ylabel("Log of Loss")
-plt.title("Loss")
-plt.show()
+    surfaceLoss = plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
+    surfaceLosses.append(surfaceLoss)
+
+    plt.semilogy(losses)
+    plt.xlabel("Epochs")
+    plt.ylabel("Log of Loss")
+    plt.title("Loss")
+    plt.show()
 
 plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
+
+plt.semilogy(lrs,surfaceLosses)
+plt.xlabel("Learning Rate")
+plt.ylabel("Mean Squared Error ")
+plt.title("Mean Squared Error of Network from Exact Solution")
+plt.show()
+
+plt.semilogy(lrs,finalLosses)
+plt.xlabel("Learning Rate")
+plt.ylabel("Final Loss")
+plt.title("Effect of Learning Rate on Final Loss")
+plt.show()
+
 
 #%%
