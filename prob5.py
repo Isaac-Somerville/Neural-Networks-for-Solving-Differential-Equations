@@ -71,7 +71,8 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     for epoch in range(epochs+1):
         for batch in loader:
             n_out = network(batch).view(-1,1)
-            x, y = batch[:,0].view(-1,1), batch[:,1].view(-1,1)
+            # x, y = batch[:,0].view(-1,1), batch[:,1].view(-1,1)
+            x,y = torch.split(batch, 1 ,dim = 1)
 
             # Get value of trial solution f(x,y)
             trial = diffEq.trial(x,y,n_out)

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x-coordinates as test data"""
     def __init__(self, num_samples, xrange):
-        self.data_in  = torch.linspace(xrange[0], xrange[1], num_samples, requires_grad=True)
+        self.data_in  = torch.linspace(xrange[0], xrange[1], num_samples, requires_grad=True).view(-1,1)
 
     def __len__(self):
         return len(self.data_in)
@@ -80,8 +80,7 @@ def train(network1, network2, loader, loss_fn, optimiser, diffEq, epochs, iterat
     network1.train(True)
     network2.train(True)
     for epoch in range(epochs+1):
-        for batch in loader:
-            x = batch.view(-1, 1)
+        for x in loader:
             n1_out = network1(x)
             n2_out = network2(x)
 

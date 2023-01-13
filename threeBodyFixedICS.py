@@ -34,19 +34,17 @@ class Fitter(torch.nn.Module):
     def __init__(self, numHiddenNodes,numHiddenLayers):
         super(Fitter, self).__init__()
         self.fc1 = torch.nn.Linear(5, numHiddenNodes)
-        # self.fcs = [torch.nn.Linear(numHiddenNodes,numHiddenNodes) for _ in range(numHiddenLayers)]
-        # print(self.fcs)
+        self.fcs = [torch.nn.Linear(numHiddenNodes,numHiddenNodes) for _ in range(numHiddenLayers)]
         self.fcLast = torch.nn.Linear(numHiddenNodes, 4)
 
     def forward(self, input):
         hidden = torch.tanh(self.fc1(input))
-        # for i in range(len(self.fcs)):
-        #     print(self.fcs[i])
-        #     hidden = torch.tanh(self.fcs[i](hidden))
+        for i in range(len(self.fcs)):
+            hidden = torch.tanh(self.fcs[i](hidden))
         out = self.fcLast(hidden)
-        xOut, yOut, uOut, vOut = out[:,0].view(-1,1), out[:,1].view(-1,1), out[:,2].view(-1,1), out[:,3].view(-1,1)
         # print(out)
-        # print(xOut)
+        out = out.transpose(0,1)
+        xOut, yOut, uOut, vOut = out[0].view(-1,1), out[1].view(-1,1), out[2].view(-1,1), out[3].view(-1,1)
         return xOut, yOut, uOut, vOut
 
 class DiffEq():
@@ -61,27 +59,27 @@ class DiffEq():
         self.mu = mu
 
     def xTrial(self,xOut,t):
-        return self.x + (1-torch.exp(-t)) * xOut
+        return self.x + (1 - torch.exp(-t)) * xOut
 
     def yTrial(self,yOut,t):
-        return self.y + (1-torch.exp(-t)) * yOut
+        return self.y + (1 - torch.exp(-t)) * yOut
 
     def uTrial(self,uOut,t):
-        return self.u + (1-torch.exp(-t)) * uOut
+        return self.u + (1 - torch.exp(-t)) * uOut
 
     def vTrial(self,vOut,t):
-        return self.v + (1-torch.exp(-t)) * vOut
+        return self.v + (1 - torch.exp(-t)) * vOut
 
     def dxEq(self, uOut, xOut,t):
         u = self.uTrial(uOut,t)
         xTrial = self.xTrial(xOut,t)
-        dxTrial = grad(xTrial,t,torch.ones_like(xTrial), create_graph=True,retain_graph=True)[0]
+        dxTrial = grad(xTrial,t,torch.ones_like(t), create_graph=True)[0]
         return dxTrial - u
 
     def dyEq(self, vOut, yOut,t):
         v = self.vTrial(vOut,t)
         yTrial = self.yTrial(yOut,t)
-        dyTrial = grad(yTrial,t,torch.ones_like(yTrial), create_graph=True,retain_graph=True)[0]
+        dyTrial = grad(yTrial,t,torch.ones_like(t), create_graph=True)[0]
         return dyTrial - v
     
     def duEq(self,xOut,yOut,vOut,uOut,t):
@@ -89,10 +87,10 @@ class DiffEq():
         y = self.yTrial(yOut,t)
         v = self.vTrial(vOut,t)
         uTrial = self.uTrial(uOut,t)
-        duTrial = grad(uTrial,t,torch.ones_like(uTrial), create_graph=True,retain_graph=True)[0]
+        duTrial = grad(uTrial,t,torch.ones_like(t), create_graph=True)[0]
         return duTrial - (x - self.mu + 2*v - 
                     (((self.mu*(x-1)) / ((x-1)**2 + y**2)**(3/2)) 
-                        + (((1-self.mu)*x) / (x**2 + y**2)**(3/2)))
+                        + ((1-self.mu)*x / (x**2 + y**2)**(3/2)))
                          )
                 
 
@@ -101,10 +99,10 @@ class DiffEq():
         y = self.yTrial(yOut,t)
         u = self.uTrial(uOut,t)
         vTrial = self.vTrial(vOut,t)
-        dvTrial = grad(vTrial,t,torch.ones_like(vTrial), create_graph=True,retain_graph=True)[0]
+        dvTrial = grad(vTrial,t,torch.ones_like(t), create_graph=True)[0]
         return dvTrial - (y - 2*u - 
                     (((self.mu * y) / ((x-1)**2 + y**2)**(3/2))
-                        +(((1-self.mu)*y) / (x**2 + y**2)**(3/2) ))
+                        +((1-self.mu)*y / (x**2 + y**2)**(3/2) ))
                         )
                 
 
@@ -113,53 +111,34 @@ class DiffEq():
     #             + self.duEq(xOut,yOut,vOut,uOut,t)
     #             + self.dvEq(xOut,yOut,uOut,vOut,t))
 
-def train(network, lossFn, optimiser, xRange,yRange,uRange,vRange,tRange,
+def train(network, lossFn, optimiser, data, xRange,yRange,uRange,vRange,tRange,
             numSamples, mu, lmbda, epochs, iterations, numTimeSteps):
     """Trains the neural network"""
     costList=[]
     network.train(True)
+    batch = data.data_in
+    t = torch.linspace(tRange[0],tRange[1],numTimeSteps,requires_grad=True).view(-1,1)
+    x = torch.tensor([batch[0][0] for _ in range(numTimeSteps)]).view(-1,1)
+    y = torch.tensor([batch[0][1] for _ in range(numTimeSteps)]).view(-1,1)
+    u = torch.tensor([batch[0][2] for _ in range(numTimeSteps)]).view(-1,1)
+    v = torch.tensor([batch[0][3] for _ in range(numTimeSteps)]).view(-1,1)
+    diffEq = DiffEq(x, y, u, v, mu)
+    input = torch.cat((x,y,u,v,t),dim=1)
     for epoch in range(epochs+1):
-        batch = DataSet(xRange,yRange,uRange,vRange,tRange,numSamples).data_in
-        x = batch[:,0].view(-1,1)
-        y = batch[:,1].view(-1,1)
-        u = batch[:,2].view(-1,1)
-        v = batch[:,3].view(-1,1)
-        t = batch[:,4].view(-1,1)
-        # print(x)
-        # print(y)
-        # print(u)
-        # print(v)
-        # print(t)
-
-        xOut, yOut, uOut, vOut = network(batch)
-        # print(xOut)
-        # print(yOut)
-        # print(uOut)
-        # print(vOut)
-
-        # xOut = nOut[0,:].view(-1,1)
-        # yOut = nOut[1,:].view(-1,1)
-        # uOut = nOut[2,:].view(-1,1)
-        # vOut = nOut[3,:].view(-1,1)
-
-        diffEq = DiffEq(x, y, u, v, mu)
-        # print(diffEq.xTrial(xOut, t))
-        # print(diffEq.yTrial(yOut, t))
-        # print(diffEq.uTrial(uOut, t))
-        # print(diffEq.vTrial(vOut, t))
-
+        xOut, yOut, uOut, vOut = network(input)
 
         # calculate loss
         dxEq = diffEq.dxEq(uOut, xOut,t)
         dyEq = diffEq.dyEq(vOut, yOut,t)
         duEq = diffEq.duEq(xOut,yOut,vOut,uOut,t)
         dvEq = diffEq.dvEq(xOut,yOut,uOut,vOut,t)
+
         # D = torch.exp(-lmbda*t) * diffEq.totalDiffEq(xOut,yOut,uOut,vOut,t)
-        dxLoss = lossFn( torch.exp(-lmbda*t) * dxEq, torch.zeros_like(dxEq))
-        dyLoss = lossFn( torch.exp(-lmbda*t) * dyEq, torch.zeros_like(dyEq))
-        duLoss = lossFn( torch.exp(-lmbda*t) * duEq, torch.zeros_like(duEq))
-        dvLoss = lossFn( torch.exp(-lmbda*t) * dvEq, torch.zeros_like(dvEq))
-        loss = (dxLoss + dyLoss + duLoss + dvLoss) / numSamples
+        dxLoss = lossFn(  dxEq, torch.zeros_like(dxEq))
+        dyLoss = lossFn(  dyEq, torch.zeros_like(dyEq))
+        duLoss = lossFn(  duEq, torch.zeros_like(duEq))
+        dvLoss = lossFn(  dvEq, torch.zeros_like(dvEq))
+        loss = (dxLoss + dyLoss + duLoss + dvLoss)
 
         # optimisation
         loss.backward()
@@ -167,7 +146,7 @@ def train(network, lossFn, optimiser, xRange,yRange,uRange,vRange,tRange,
         optimiser.zero_grad()
 
         if epoch == epochs:
-            plotNetwork(network, mu, epoch, epochs, iterations, 
+            plotNetwork(network, data, mu, epoch, epochs, iterations, 
                         xRange, yRange, uRange,vRange,tRange, numTimeSteps)
 
         #store final loss of each epoch
@@ -176,10 +155,10 @@ def train(network, lossFn, optimiser, xRange,yRange,uRange,vRange,tRange,
     network.train(False)
     return costList
 
-def plotNetwork(network, mu, epoch, epochs, iterations, 
+def plotNetwork(network, data, mu, epoch, epochs, iterations, 
                 xRange, yRange,uRange,vRange,tRange, numTimeSteps):
     timeStep = (tRange[1] - tRange[0]) / numTimeSteps
-    batch = DataSet(xRange,yRange,uRange,vRange,tRange,10).data_in
+    batch = data.data_in
     t = torch.linspace(tRange[0],tRange[1],numTimeSteps,requires_grad=True).view(-1,1)
 
     for i in range(len(batch)):
@@ -187,10 +166,6 @@ def plotNetwork(network, mu, epoch, epochs, iterations,
         y = torch.tensor([batch[i][1] for _ in range(numTimeSteps)]).view(-1,1)
         u = torch.tensor([batch[i][2] for _ in range(numTimeSteps)]).view(-1,1)
         v = torch.tensor([batch[i][3] for _ in range(numTimeSteps)]).view(-1,1)
-        x.requires_grad_()
-        y.requires_grad_()
-        u.requires_grad_()
-        v.requires_grad_()
         diffEq = DiffEq(x, y, u, v, mu)
         input = torch.cat((x,y,u,v,t),dim=1)
         # for j in range(5):
@@ -198,7 +173,7 @@ def plotNetwork(network, mu, epoch, epochs, iterations,
         # print(input)
         xOut, yOut, uOut, vOut = network(input)
         xTrial = diffEq.xTrial(xOut,t).detach().numpy()
-        #print(len(xTrial))
+        # print(len(xTrial))
         yTrial = diffEq.yTrial(yOut,t).detach().numpy()
         # print(xTrial)
         # print(yTrial)
@@ -257,7 +232,7 @@ def rungeKutta(x0, y0, u0, v0, t0, mu, tFinal, timeStep):
     xList = [x0]
     yList = [y0]
     for _ in range(n):
-         # Apply Runge Kutta Formulas to find next value of x, y, u, v
+        "Apply Runge Kutta Formulas to find next value of x, y, u, v"
         a1 = timeStep * dxdt(x,y,u,v,mu)
         b1 = timeStep * dydt(x,y,u,v,mu)
         c1 = timeStep * dudt(x,y,u,v,mu)
@@ -298,20 +273,21 @@ yRange = [0.099, 0.101]
 uRange = [-0.5,-0.4]
 vRange = [-0.3,-0.2]
 tRange = [-0.01,5]
-numSamples = 100
+numSamples = 5
 mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
 
-network   = Fitter(numHiddenNodes=32, numHiddenLayers=1)
+network    = Fitter(numHiddenNodes=8, numHiddenLayers=2)
 lossFn    = torch.nn.MSELoss()
-optimiser = torch.optim.Adam(network.parameters(), lr = 1e-3)
+optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
+data = DataSet(xRange,yRange,uRange,vRange,tRange,1)
 
 losses = [1]
 iterations = 0
 epochs = 5000
-while iterations < 10:
-    newLoss = train(network, lossFn, optimiser, xRange,yRange,uRange,vRange,tRange,
+while iterations < 20:
+    newLoss = train(network, lossFn, optimiser, data, xRange,yRange,uRange,vRange,tRange,
             numSamples, mu, lmbda, epochs, iterations, numTimeSteps)
     losses.extend(newLoss)
     iterations += 1
@@ -321,5 +297,3 @@ plt.xlabel("Epochs")
 plt.ylabel("Log of Loss")
 plt.title("Loss")
 plt.show()
-
-#%%

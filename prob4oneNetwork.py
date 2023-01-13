@@ -9,7 +9,7 @@ class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x-coordinates as test data"""
     def __init__(self, xrange, num_samples):
         # self.data_in  = torch.rand(num_samples, requires_grad=True)
-        self.data_in  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True)
+        self.data_in  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True).view(-1,1)
 
     def __len__(self):
         return len(self.data_in)
@@ -86,8 +86,7 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     for epoch in range(epochs+1):
         # train_set    = DataSet(num_samples)
         # loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=30, shuffle=True)
-        for batch in loader:
-            x = batch.view(-1, 1)
+        for x in loader:
             n1_out, n2_out = network(x)
 
             # Get the derivative of both networks' outputs with respect
@@ -158,10 +157,30 @@ network     = Fitter(num_hidden_nodes=32)
 loss_fn      = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 
-#ranges = [[0., 0.25], [0.25,0.5],[0.5,0.75], [0.75,1.], [0,1]]
-#ranges = [[0.75,1.],[0.5,0.75], [0.25,0.5],[0., 0.25],,[0,1]]
+# ranges = [[0., 0.25], [0.25,0.5],[0.5,0.75], [0.75,1.], [0,1]]
+# succeeds
+ 
+# ranges = [[0.75,1.],[0.5,0.75], [0.25,0.5],[0., 0.25],[0,1]]
+# succeeds 
+
 # ranges = [[0,0.5], [0.5,1.], [0,1]]
-ranges = [[0,0.5],[0,1]]
+# fails
+
+# ranges = [[0,0.5],[0,1]]
+# fails
+
+# ranges = [[0.5,1],[0,0.5],[0,1]]
+# succeeds
+
+#ranges = [[0,0.33], [0.33,0.66], [0.66,1], [0,1]]
+#succeeds
+
+# ranges = [ [0.66,1],[0.33,0.66], [0,0.33], [0,1]]
+# succeeds
+
+ranges = [[0,1]]
+# fails
+
 allLosses = []
 totalEpochs = 0
 for i in range(len(ranges)):

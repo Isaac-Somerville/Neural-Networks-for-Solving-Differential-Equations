@@ -4,5 +4,8 @@ Scope of project
 3 body problem, using a GPU?
 prob 7, loss and MSE differences
 
-Dear Kasper,
+See if new autograd method improves probs 5 and 7
+Particularly problem 7!!
 
+Investigate complexity?
+Investigate "shooting" methods

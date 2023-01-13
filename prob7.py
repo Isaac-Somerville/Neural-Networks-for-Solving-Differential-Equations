@@ -144,8 +144,8 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
             optimiser.zero_grad()
 
         # if epoch%(epochs/5)==0:
-        # if epoch == epochs:
-        #     plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
+        if epoch == epochs:
+            plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
         cost_list.append(loss.detach().numpy())
 
     network.train(False)
@@ -185,8 +185,12 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     dndx2_x1, dndy2_x1 = dn2_x1[:,0].view(-1,1), dn2_x1[:,1].view(-1,1)
     # print(dndy_x1)
 
-    dndydx_x1 = torch.autograd.grad(dndy_x1, x, torch.ones_like(dndy_x1), retain_graph=True, create_graph=True)[0]
-    dndydx2_x1 = torch.autograd.grad(dndydx_x1, x, torch.ones_like(dndydx_x1), retain_graph=True, create_graph=True)[0]
+    ddn_x1 = torch.autograd.grad(dn_x1, xy, torch.ones_like(dn_x1), retain_graph = True, create_graph = True)[0]
+    d2dn_x1 = torch.autograd.grad(ddn_x1, xy, torch.ones_like(ddn_x1), retain_graph = True, create_graph = True)[0]
+    dndydx_x1 = ddn_x1
+
+    # dndydx_x1 = torch.autograd.grad(dndy_x1, x, torch.ones_like(dndy_x1), retain_graph=True, create_graph=True)[0]
+    # dndydx2_x1 = torch.autograd.grad(dndydx_x1, x, torch.ones_like(dndydx_x1), retain_graph=True, create_graph=True)[0]
 
     trial = diffEq.trial(x,y,n_xy,n_x1,dndy_x1)
     exact = diffEq.solution(x,y).detach().numpy()
@@ -217,9 +221,10 @@ xrange = [0,1]
 yrange = [0,1]
 
 epochs = 5000
-lrs = [(7e-3 + i * 1e-4) for i in range(11)]
+# lrs = [(7e-3 + i * 1e-4) for i in range(11)]
 # lrs = [(4e-3 + i * 5e-4) for i in range(1,11)]
 # lrs = [(i * 1e-3) for i in range(1,11)]
+lrs = [1e-2]
 finalLosses = []
 surfaceLosses = []
 for lr in lrs:
@@ -231,7 +236,7 @@ for lr in lrs:
     train_set    = DataSet(xrange,yrange,num_samples)
     train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=50, shuffle=True)
     diffEq = DiffEq(xrange, yrange, num_samples)
-    while losses[-1] > 0.001  and iterations < 2:
+    while losses[-1] > 0.0001  and iterations < 10:
         newLoss = train(network, train_loader, loss_fn,
                             optimiser, diffEq, epochs, iterations)
         losses.extend(newLoss)
@@ -253,17 +258,17 @@ for lr in lrs:
 
 plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
 
-plt.semilogy(lrs,surfaceLosses)
-plt.xlabel("Learning Rate")
-plt.ylabel("Mean Squared Error ")
-plt.title("Mean Squared Error of Network from Exact Solution")
-plt.show()
+# plt.semilogy(lrs,surfaceLosses)
+# plt.xlabel("Learning Rate")
+# plt.ylabel("Mean Squared Error ")
+# plt.title("Mean Squared Error of Network from Exact Solution")
+# plt.show()
 
-plt.semilogy(lrs,finalLosses)
-plt.xlabel("Learning Rate")
-plt.ylabel("Final Loss")
-plt.title("Effect of Learning Rate on Final Loss")
-plt.show()
+# plt.semilogy(lrs,finalLosses)
+# plt.xlabel("Learning Rate")
+# plt.ylabel("Final Loss")
+# plt.title("Effect of Learning Rate on Final Loss")
+# plt.show()
 
 
 #%%

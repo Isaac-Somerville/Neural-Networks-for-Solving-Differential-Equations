@@ -1,9 +1,9 @@
+#%%
+
 import torch
-import time
-import numpy as np
-import math
-import matplotlib
-import matplotlib.pyplot as plt
+from torch.autograd import grad
+import torch.nn as nn
+import torch.optim as optim
 
 # x = [[1,2,3],
 #      [4,5,6],
@@ -32,13 +32,13 @@ import matplotlib.pyplot as plt
 # print(np.square(x-y).mean())
 
 
-x = [[1,2,3],
-     [4,5,6]]
+# x = [[1,2,3],
+#      [4,5,6]]
 
-y = np.array(x)
-print(y.shape)
-z = np.exp(y)
-print(z)
+# y = np.array(x)
+# print(y.shape)
+# z = np.exp(y)
+# print(z)
 
 # coordinates = (0,0,2)
 # print(y[coordinates])
@@ -47,3 +47,66 @@ print(z)
 # y = torch.tensor(x)
 # print(y.size(dim = 0))
 
+# def exp_reducer(x):
+#   return x.exp().sum(dim=0)
+# inputs = torch.rand(2, 5)
+# print(inputs)
+# print(inputs.exp())
+# print(exp_reducer(inputs))
+# print(jacobian(exp_reducer, inputs))
+
+# print(jacobian(exp_reducer, inputs).shape)
+
+# def exp_adder(x, y):
+#      # print(2* x.exp())
+#      # print(3 * y)
+
+#      return 2 * x.exp() + 3 * y
+# inputs = (torch.rand(2), torch.rand(2))
+# print(inputs)
+# print(exp_adder(inputs[0],inputs[1]))
+# jacobian(exp_adder, inputs)
+
+class net_x(nn.Module): 
+        def __init__(self):
+            super(net_x, self).__init__()
+            self.fc1=nn.Linear(2, 20) 
+            self.fc2=nn.Linear(20, 20)
+            self.out=nn.Linear(20, 4) #a,b,c,d
+
+        def forward(self, x):
+            x=torch.tanh(self.fc1(x))
+            x=torch.tanh(self.fc2(x))
+            x=self.out(x)
+            return x
+
+nx = net_x()
+
+#input
+
+val = 10
+a = torch.rand(val, requires_grad = True) #input vector
+print(a)
+t = torch.reshape(a, (5,2)) #reshape for batch
+print(t)
+
+# #method 
+# dx = torch.autograd.functional.jacobian(nx, t)
+# print(dx.shape)
+# print(dx)
+# print(torch.diagonal(dx,0,-1))
+# #dx = torch.diagonal(torch.diagonal(dx, 0, -1), 0)[0] #first vector
+# dx = torch.diagonal(torch.diagonal(dx, 1, -1), 0)[0] #2nd vector
+# #dx = torch.diagonal(torch.diagonal(dx, 2, -1), 0)[0] #3rd vector
+# #dx = torch.diagonal(torch.diagonal(dx, 3, -1), 0)[0] #4th vector
+# print(dx)
+
+print(a.grad)
+out = nx(t)
+m = torch.zeros((5,4))
+print(m)
+m[:, 0] = 1
+print(m)
+out.backward(m)
+print(a.grad)
+# %%
