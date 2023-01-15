@@ -4,6 +4,8 @@ import torch.utils.data
 import numpy as np
 import matplotlib.pyplot as plt
 
+# TODO: CLEAN UP CODE 
+
 class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x- and y-coordinates as test data"""
     def __init__(self, xrange, yrange, num_samples):
@@ -109,25 +111,59 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
             # print(y1)
             xy1 = torch.cat((x,y1),1)
             # print(xy1)
+            # print(xy1)
             n_xy = network(batch).view(-1,1)
             # print(n_xy)
             n_x1 = network(xy1).view(-1,1)
             # print(n_x1)
+            # print(n_x1)
 
             dn = torch.autograd.grad(n_xy, batch, torch.ones_like(n_xy), retain_graph=True, create_graph=True)[0]
             dn2 = torch.autograd.grad(dn, batch, torch.ones_like(dn), retain_graph=True, create_graph=True)[0]
+
+            # dn/dx , dn/dy
             dndx, dndy = dn[:,0].view(-1,1), dn[:,1].view(-1,1)
-            dndx2, dndy2 = dn2[:,0].view(-1,1), dn[:,1].view(-1,1)
+
+            # d^2 n / dx^2 , d^2 n / dy^2
+            dndx2, dndy2 = torch.split(dn2 , 1, dim = 1 )
+            # dn2[:,0].view(-1,1), dn[:,1].view(-1,1)
 
             dn_x1 = torch.autograd.grad(n_x1, xy1, torch.ones_like(n_x1), retain_graph=True, create_graph=True)[0]
-            dn2_x1 = torch.autograd.grad(dn_x1, xy1, torch.ones_like(dn_x1), retain_graph=True, create_graph=True)[0]
             # print(dn_x1)
-            dndx_x1, dndy_x1 = dn_x1[:,0].view(-1,1), dn_x1[:,1].view(-1,1)
-            dndx2_x1, dndy2_x1 = dn2_x1[:,0].view(-1,1), dn2_x1[:,1].view(-1,1)
+            # dn / dx |(y=1) , dn/dy |(y=1)
+            dndx_x1, dndy_x1 = torch.split(dn_x1 , 1, dim = 1 )
+            # dn_x1[:,0].view(-1,1), dn_x1[:,1].view(-1,1)
             # print(dndy_x1)
 
-            dndydx_x1 = torch.autograd.grad(dndy_x1, x, torch.ones_like(dndy_x1), retain_graph=True, create_graph=True)[0]
-            dndydx2_x1 = torch.autograd.grad(dndydx_x1, x, torch.ones_like(dndydx_x1), retain_graph=True, create_graph=True)[0]
+            dn2dx_x1 = torch.autograd.grad(dndx_x1, xy1, torch.ones_like(dndx_x1), retain_graph = True, create_graph = True)[0]
+            # print(dn2dx_x1)
+            # d^2n / dx^2 |(y=1)
+            dndx2_x1 , _= torch.split(dn2dx_x1, 1, dim = 1)
+            # dn2dx_x1[:,0].view(-1,1)
+
+            dn2dy_x1 = torch.autograd.grad(dndy_x1, xy1, torch.ones_like(dndy_x1), retain_graph = True, create_graph = True)[0]
+            # print(dn2dy_x1)
+            # d/dx (dn/dy |(y=1))
+            dndydx_x1 , _ = torch.split(dn2dy_x1, 1, dim=1)
+            # dn2dy_x1[:,0].view(-1,1)
+
+            dn3dy_x1 = torch.autograd.grad(dndydx_x1, xy1, torch.ones_like(dndydx_x1), retain_graph = True, create_graph = True)[0]
+            # print(dn3dy_x1)
+            # d^2/dx^2 (dn/dy |(y=1))
+            dndydx2_x1 ,  _= torch.split(dn3dy_x1, 1, dim=1)
+            # dn3dy_x1[:,0].view(-1,1)
+
+            # dn2_x1 = torch.autograd.grad(dn_x1, xy1, torch.ones_like(dn_x1), retain_graph=True, create_graph=True)[0]
+            # # d^2 n / dx^2 |(y=1) , d^2 n / dy^2|(y=1)
+            # dndx2_x1, dndy2_x1 = dn2_x1[:,0].view(-1,1), dn2_x1[:,1].view(-1,1)
+
+            
+            # print(dndy_x1)
+
+            # d^2 n / dx^2 |(y=1) , d^2 n / dy^2|(y=1)
+
+            # dndydx_x1 = torch.autograd.grad(dndy_x1, x, torch.ones_like(dndy_x1), retain_graph=True, create_graph=True)[0]
+            # dndydx2_x1 = torch.autograd.grad(dndydx_x1, x, torch.ones_like(dndydx_x1), retain_graph=True, create_graph=True)[0]
 
             trial_dx2 = diffEq.dx2_trial(x,y,n_xy, n_x1, dndy_x1, dndx, dndx_x1, dndydx_x1, dndx2, dndx2_x1, dndydx2_x1)
             trial_dy2 = diffEq.dy2_trial(x,y,dndy,dndy2)
@@ -143,8 +179,8 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
             optimiser.step()
             optimiser.zero_grad()
 
-        # if epoch%(epochs/5)==0:
-        if epoch == epochs:
+        if epoch%(epochs/5)==0:
+        # if epoch == epochs:
             plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
         cost_list.append(loss.detach().numpy())
 
@@ -182,12 +218,12 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     dn2_x1 = torch.autograd.grad(dn_x1, xy1, torch.ones_like(dn_x1), retain_graph=True, create_graph=True)[0]
     # print(dn_x1)
     dndx_x1, dndy_x1 = dn_x1[:,0].view(-1,1), dn_x1[:,1].view(-1,1)
-    dndx2_x1, dndy2_x1 = dn2_x1[:,0].view(-1,1), dn2_x1[:,1].view(-1,1)
-    # print(dndy_x1)
+    # dndx2_x1, dndy2_x1 = dn2_x1[:,0].view(-1,1), dn2_x1[:,1].view(-1,1)
+    # # print(dndy_x1)
 
-    ddn_x1 = torch.autograd.grad(dn_x1, xy, torch.ones_like(dn_x1), retain_graph = True, create_graph = True)[0]
-    d2dn_x1 = torch.autograd.grad(ddn_x1, xy, torch.ones_like(ddn_x1), retain_graph = True, create_graph = True)[0]
-    dndydx_x1 = ddn_x1
+    # ddn_x1 = torch.autograd.grad(dn_x1, xy, torch.ones_like(dn_x1), retain_graph = True, create_graph = True)[0]
+    # d2dn_x1 = torch.autograd.grad(ddn_x1, xy, torch.ones_like(ddn_x1), retain_graph = True, create_graph = True)[0]
+    # dndydx_x1 = ddn_x1
 
     # dndydx_x1 = torch.autograd.grad(dndy_x1, x, torch.ones_like(dndy_x1), retain_graph=True, create_graph=True)[0]
     # dndydx2_x1 = torch.autograd.grad(dndydx_x1, x, torch.ones_like(dndydx_x1), retain_graph=True, create_graph=True)[0]
@@ -234,7 +270,7 @@ for lr in lrs:
     loss_fn      = torch.nn.MSELoss()
     optimiser  = torch.optim.Adam(network.parameters(), lr = lr)
     train_set    = DataSet(xrange,yrange,num_samples)
-    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=50, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=5, shuffle=True)
     diffEq = DiffEq(xrange, yrange, num_samples)
     while losses[-1] > 0.0001  and iterations < 10:
         newLoss = train(network, train_loader, loss_fn,

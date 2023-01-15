@@ -182,14 +182,14 @@ diffEq = DiffEq(xrange, yrange, num_samples)
 
 network     = Fitter(num_hidden_nodes=10)
 loss_fn      = torch.nn.MSELoss()
-optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
+optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-3)
 train_set    = DataSet(xrange,yrange,num_samples)
 train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=8, shuffle=True)
 
 losses = [1]
 iterations = 0
 epochs = 5000
-while losses[-1] > 0.001  and iterations < 10:
+while losses[-1] > 1e-7 and iterations < 10:
     newLoss = train(network, train_loader, loss_fn,
                         optimiser, diffEq, epochs, iterations)
     losses.extend(newLoss)

@@ -440,8 +440,8 @@ loader = torch.utils.data.DataLoader(dataset=trainData, batch_size=1000, shuffle
 
 losses = [1]
 iterations = 0
-epochs = 5000
-while iterations < 10:
+epochs = 1000
+while iterations < 20:
     newLoss = train(
         network,
         lossFn,
