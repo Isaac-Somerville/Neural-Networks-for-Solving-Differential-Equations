@@ -139,7 +139,7 @@ class DiffEq:
     #             + self.duEq(xOut,yOut,vOut,uOut,t)
     #             + self.dvEq(xOut,yOut,uOut,vOut,t))
 
-def train(network, lossFn, optimiser, data, xRange,yRange,uRange,vRange,tRange,
+def train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRange,tRange,
             numSamples, mu, lmbda, epochs, iterations, numTimeSteps):
     """Trains the neural network"""
     costList=[]
@@ -197,11 +197,20 @@ def train(network, lossFn, optimiser, data, xRange,yRange,uRange,vRange,tRange,
         loss.backward()
         optimiser.step()
         optimiser.zero_grad()
+        scheduler.step(loss)
+
+        #store final loss of each epoch
+        costList.append(loss.detach().numpy())
 
         if epoch == epochs:
             plotNetwork(network, data, mu, epoch, epochs, iterations, 
                         xRange, yRange, uRange,vRange,tRange, numTimeSteps)
-            print(loss.detach().numpy())
+            print("current loss = ", loss.detach().numpy())
+            plt.semilogy(costList)
+            plt.xlabel("Epochs")
+            plt.ylabel("Log of Loss")
+            plt.title("Loss")
+            plt.show()
 
         #store final loss of each epoch
         costList.append(loss.detach().numpy())
@@ -329,16 +338,25 @@ mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
 
-network    = Fitter(numHiddenNodes=16, numHiddenLayers=2, doBatchNorm=False)
+network    = Fitter(numHiddenNodes=32, numHiddenLayers=1, doBatchNorm=False)
 lossFn    = torch.nn.MSELoss()
-optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-3)
+optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimiser, 
+        factor=0.1, 
+        patience=1000, 
+        threshold=1e-4, 
+        cooldown=0, 
+        min_lr=0, 
+        eps=1e-8, 
+        verbose=True)
 data = DataSet(xRange,yRange,uRange,vRange,tRange,1)
 
 losses = [1]
 iterations = 0
 epochs = 1000
-while iterations < 50:
-    newLoss = train(network, lossFn, optimiser, data, xRange,yRange,uRange,vRange,tRange,
+while iterations < 100:
+    newLoss = train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRange,tRange,
             numSamples, mu, lmbda, epochs, iterations, numTimeSteps)
     losses.extend(newLoss)
     iterations += 1

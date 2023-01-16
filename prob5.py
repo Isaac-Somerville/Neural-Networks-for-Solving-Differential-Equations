@@ -143,9 +143,9 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
 #     ranges.append(lst)
 # ranges.append([0,1])
 ranges = [[0,1]]
-lrs = [(1e-2 + i * 4e-4) for i in range(10)]
+# lrs = [(1e-2 + i * 4e-4) for i in range(10)]
 # lrs = [(5e-3 + i * 1e-3) for i in range(1,11)]
-# lrs = [(i * 1e-3) for i in range(1,11)]
+lrs = [(i * 1e-3) for i in range(1,11)]
 finalLosses = []
 surfaceLosses = []
 for xrange in ranges:
@@ -170,6 +170,7 @@ for xrange in ranges:
         losses = losses[1:]
         finalLoss = losses[-1]
         finalLosses.append(finalLoss)
+        print("lr = ", lr)
         print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
 
         plt.semilogy(losses)
@@ -181,12 +182,17 @@ for xrange in ranges:
         surfaceLoss = plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
         surfaceLosses.append(surfaceLoss)
 
+plt.semilogy(lrs,finalLosses)
+plt.xlabel("Learning Rate")
+plt.ylabel("Final Loss")
+plt.title("Effect of Learning Rate on Final Loss")
+plt.show()
+
 plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
 plt.show()
 plt.semilogy(lrs,surfaceLosses)
 plt.xlabel("Learning Rate")
 plt.ylabel("Mean Squared Error ")
 plt.title("Mean Squared Error of Network from Exact Solution")
-
 
 #%%

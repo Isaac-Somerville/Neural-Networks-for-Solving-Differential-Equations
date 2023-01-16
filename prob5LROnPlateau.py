@@ -78,7 +78,7 @@ class DiffEq():
         return trial_dx2 + trial_dy2 - RHS
 
 
-def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
+def train(network, loader, loss_fn, optimiser, scheduler, diffEq, epochs, iterations):
     """Trains the neural network"""
     cost_list=[]
     network.train(True)
@@ -110,9 +110,11 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
             loss.backward()
             optimiser.step()
             optimiser.zero_grad()
+            scheduler.step(loss)
             
         # if epoch%(epochs/5)==0:
         if epoch == epochs:
+            print("loss = ", loss.detach().numpy())
             plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
         
         cost_list.append(loss.detach().numpy())
@@ -144,7 +146,7 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
 
     # Calculate residual error
     surfaceLoss = ((output-exact)**2).mean()
-    print("mean square difference between trial and exact solution = ", surfaceLoss ) 
+    print("mean square difference between trial and exact solution = ", surfaceLoss) 
 
     # Plot both trial and exact solutions
     x = x.detach().numpy()
@@ -164,10 +166,10 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
 
 
 
-
-# lrs = [(i * 1e-3) for i in range(1,11)]
+# lrs = [(1e-2 + i * 4e-4) for i in range(10)]
 # lrs = [(5e-3 + i * 1e-3) for i in range(1,11)]
-lrs = [(1e-2 + i * 4e-4) for i in range(10)]
+# lrs = [(i * 1e-3) for i in range(1,11)]
+lrs = [1e-3, 5e-3, 1e-2]
 finalLosses = []
 surfaceLosses = []
 xrange = [0,1]
@@ -178,15 +180,16 @@ for lr in lrs:
     network     = Fitter(num_hidden_nodes=10)
     loss_fn      = torch.nn.MSELoss()
     optimiser  = torch.optim.Adam(network.parameters(), lr = lr)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimiser, factor=0.1, patience=500, threshold=1e-4, cooldown=0, min_lr=0, eps=1e-10, verbose=True)
     train_set    = DataSet(xrange,yrange,num_samples)
     train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=50, shuffle=True)
 
     losses = [1]
     iterations = 0
     epochs = 5000
-    while losses[-1] > 1e-5 and iterations < 1:
+    while losses[-1] > 1e-3 and iterations < 5:
         newLoss = train(network, train_loader, loss_fn,
-                            optimiser, diffEq, epochs, iterations)
+                            optimiser, scheduler, diffEq, epochs, iterations)
         losses.extend(newLoss)
         iterations += 1
     losses = losses[1:]

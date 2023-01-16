@@ -227,11 +227,13 @@ num_samples = 10
 xrange = [0,1]
 yrange = [0,1]
 
-epochs = 1000
+epochs = 10000
 # lrs = [(7e-3 + i * 1e-4) for i in range(11)]
 # lrs = [(4e-3 + i * 5e-4) for i in range(1,11)]
+# lrs = [1e-3]
+
 # lrs = [(i * 1e-3) for i in range(1,11)]
-lrs = [1e-3]
+lrs = [(i * 1e-4) for i in range(1,11)]
 finalLosses = []
 surfaceLosses = []
 for lr in lrs:
@@ -243,7 +245,7 @@ for lr in lrs:
     train_set    = DataSet(xrange,yrange,num_samples)
     train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=100, shuffle=True)
     diffEq = DiffEq(xrange, yrange, num_samples)
-    while losses[-1] > 0.001  and iterations < 50:
+    while losses[-1] > 0.001  and iterations < 2:
         newLoss = train(network, train_loader, loss_fn,
                             optimiser, diffEq, epochs, iterations)
         losses.extend(newLoss)
@@ -265,17 +267,15 @@ for lr in lrs:
 
 plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
 
-# plt.semilogy(lrs,surfaceLosses)
-# plt.xlabel("Learning Rate")
-# plt.ylabel("Mean Squared Error ")
-# plt.title("Mean Squared Error of Network from Exact Solution")
-# plt.show()
+plt.semilogy(lrs,surfaceLosses)
+plt.xlabel("Learning Rate")
+plt.ylabel("Mean Squared Error ")
+plt.title("Mean Squared Error of Network from Exact Solution")
+plt.show()
 
-# plt.semilogy(lrs,finalLosses)
-# plt.xlabel("Learning Rate")
-# plt.ylabel("Final Loss")
-# plt.title("Effect of Learning Rate on Final Loss")
-# plt.show()
-
-
+plt.semilogy(lrs,finalLosses)
+plt.xlabel("Learning Rate")
+plt.ylabel("Final Loss")
+plt.title("Effect of Learning Rate on Final Loss")
+plt.show()
 #%%
