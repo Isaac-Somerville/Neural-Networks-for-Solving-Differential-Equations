@@ -5,9 +5,6 @@ import torch.distributions
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.autograd import grad
-from torch.autograd.functional import jacobian as jac
-from torch.autograd.gradcheck import zero_gradients
-
 
 class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x- and y-coordinates as test data"""
@@ -47,23 +44,30 @@ class DataSet(torch.utils.data.Dataset):
 class Fitter(torch.nn.Module):
     """Forward propagations"""
 
-    def __init__(self, numHiddenNodes, numHiddenLayers):
+    def __init__(self, numHiddenNodes, numHiddenLayers, doBatchNorm):
         super(Fitter, self).__init__()
         self.fc1 = torch.nn.Linear(5, numHiddenNodes)
         self.fcs = [
             torch.nn.Linear(numHiddenNodes, numHiddenNodes)
             for _ in range(numHiddenLayers)
         ]
+        self.doBatchNorm = doBatchNorm
+        if doBatchNorm:
+            self.batchNorms = [
+                torch.nn.BatchNorm1d(num_features = numHiddenNodes) 
+                for _ in range(numHiddenLayers)
+            ]
         self.fcLast = torch.nn.Linear(numHiddenNodes, 4)
 
     def forward(self, input):
         hidden = torch.tanh(self.fc1(input))
         for i in range(len(self.fcs)):
-            hidden = torch.tanh(self.fcs[i](hidden))
+            if self.doBatchNorm:
+                hiddenNormed = self.batchNorms[i](self.fcs[i](hidden))
+                hidden = torch.tanh(hiddenNormed)
+            else:
+                hidden = torch.tanh(self.fcs[i](hidden))
         out = self.fcLast(hidden)
-        # xOut, yOut, uOut, vOut = out[:,0].view(-1,1), out[:,1].view(-1,1), out[:,2].view(-1,1), out[:,3].view(-1,1)
-        # print(out)
-        # print(xOut)
         return out
 
 
@@ -71,7 +75,6 @@ class DiffEq:
     """
     Differential equations from Flamant et al. for Planar Three Body Problem
     """
-
     def __init__(self, x, y, u, v, mu):
         self.x = x
         self.y = y
@@ -142,7 +145,6 @@ class DiffEq:
             )
         )
 
-
 def train(
     network,
     lossFn,
@@ -166,57 +168,32 @@ def train(
     for epoch in range(epochs + 1):
         for batch in loader:
             # print(batch)
-
             # print(batch.shape)
-            x = batch[:,0].view(-1,1)
-            y = batch[:,1].view(-1,1)
-            u = batch[:,2].view(-1,1)
-            v = batch[:,3].view(-1,1)
-            t = batch[:,4].view(-1,1)
-
+            # Input variables
+            x, y, u, v, t = torch.split(batch, 1, dim = 1)
             # print(x)
             # print(y)
             # print(u)
             # print(v)
             # print(t)
 
+            # NN outputs
             out = network.forward(batch)
             # print(out)
             # print(out.shape)
             xOut, yOut, uOut, vOut = torch.split(out, 1, dim = 1)
-            #print(batch.grad)
-            # print(xOut)
-            # # print(yOut)
-            # print(uOut)
-            # print(vOut)
-            dxOut = grad(xOut,batch,torch.ones_like(xOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
-            dyOut = grad(yOut,batch,torch.ones_like(yOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
-            duOut = grad(uOut,batch,torch.ones_like(uOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
-            dvOut = grad(vOut,batch,torch.ones_like(vOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
-
-            # xOut = out[:,0].view(-1,1)
-            # yOut = out[:,1].view(-1,1)
-            # uOut = out[:,2].view(-1,1)
-            # vOut = out[:,3].view(-1,1)
-
             # print(xOut)
             # print(yOut)
             # print(uOut)
             # print(vOut)
 
-            
-            #print(compute_jacobian(batch, out))
-            # for line in out:
-            #     print(line)
-            #     print(grad(line,batch, torch.ones_like(out), retain_graph=True, create_graph=True )[0])
-            # dOut = grad(out, batch, torch.ones_like(out), create_graph=True, retain_graph=True)[0]
-            # print(dOut)
-            # print(dOut.shape)
-            # dxOut = dOut[:, 0].view(-1, 1)
-            # dyOut = dOut[:, 1].view(-1, 1)
-            # duOut = dOut[:, 2].view(-1, 1)
-            # dvOut = dOut[:, 3].view(-1, 1)
+            # Get d/dt for every output variable
+            dxOut = grad(xOut,batch,torch.ones_like(xOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
+            dyOut = grad(yOut,batch,torch.ones_like(yOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
+            duOut = grad(uOut,batch,torch.ones_like(uOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
+            dvOut = grad(vOut,batch,torch.ones_like(vOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
 
+            # Initialise differential equation class for these inputs
             diffEq = DiffEq(x, y, u, v, mu)
             # print(diffEq.xTrial(xOut, t))
             # print(diffEq.yTrial(yOut, t))
@@ -228,13 +205,11 @@ def train(
             dyEq = diffEq.dyEq(vOut, yOut, dyOut, t)
             duEq = diffEq.duEq(xOut, yOut, vOut, uOut, duOut, t)
             dvEq = diffEq.dvEq(xOut, yOut, uOut, vOut, dvOut, t)
-
-            # D = torch.exp(-lmbda*t) * diffEq.totalDiffEq(xOut,yOut,uOut,vOut,t)
             dxLoss = lossFn(torch.exp(-lmbda * t) * dxEq, torch.zeros_like(dxEq))
             dyLoss = lossFn(torch.exp(-lmbda * t) * dyEq, torch.zeros_like(dyEq))
             duLoss = lossFn(torch.exp(-lmbda * t) * duEq, torch.zeros_like(duEq))
             dvLoss = lossFn(torch.exp(-lmbda * t) * dvEq, torch.zeros_like(dvEq))
-            loss = (dxLoss + dyLoss + duLoss + dvLoss) / numSamples
+            loss = (dxLoss + dyLoss + duLoss + dvLoss)
 
             # optimisation
             loss.backward()
@@ -242,6 +217,7 @@ def train(
             optimiser.zero_grad()
 
         if epoch == epochs:
+            print(loss.detach().numpy())
             plotNetwork(
                 network,
                 mu,
@@ -261,29 +237,6 @@ def train(
 
     network.train(False)
     return costList
-
-# def compute_jacobian(inputs, output):
-#     """
-# 	:param inputs: Batch X Size (e.g. Depth X Width X Height)
-# 	:param output: Batch X Classes
-# 	:return: jacobian: Batch X Classes X Size
-# 	"""
-#     assert inputs.requires_grad
-
-#     num_classes = output.size()[1]
-
-#     jacobian = torch.zeros(num_classes, *inputs.size())
-#     grad_output = torch.zeros(*output.size())
-#     inputs.retain_grad()
-
-#     for i in range(num_classes):
-#         zero_gradients(inputs)
-#         grad_output.zero_()
-#         grad_output[:, i] = 1
-#         output.backward(grad_output, retain_graph = True)
-#         jacobian[i] = inputs.grad.data
-
-#     return torch.transpose(jacobian, dim0=0, dim1=1)
 
 def plotNetwork(
     network,
@@ -309,15 +262,11 @@ def plotNetwork(
         v = torch.tensor([testData[i][3] for _ in range(numTimeSteps)]).view(-1, 1)
         diffEq = DiffEq(x, y, u, v, mu)
         input = torch.cat((x, y, u, v, t), dim=1)
-        # for j in range(5):
-        #     print(input[j])
-        # print(input)
         out = network(input)
         xOut = out[:, 0].view(-1, 1)
         yOut = out[:, 1].view(-1, 1)
 
         xTrial = diffEq.xTrial(xOut, t).detach().numpy()
-        # print(len(xTrial))
         yTrial = diffEq.yTrial(yOut, t).detach().numpy()
         # print(xTrial)
         # print(yTrial)
@@ -336,8 +285,6 @@ def plotNetwork(
     plt.plot([1.0], [0.0], marker=".", markersize=10)
     plt.xlabel("x")
     plt.ylabel("y")
-    # plt.xlim((-1,1.1))
-    # plt.ylim((-1,1))
     plt.title(str(epoch + iterations * epochs) + " Epochs")
     plt.show()
 
@@ -413,6 +360,7 @@ def rungeKutta(x0, y0, u0, v0, t0, mu, tFinal, timeStep):
         u = u + (1.0 / 6.0) * (c1 + 2 * c2 + 2 * c3 + c4)
         v = v + (1.0 / 6.0) * (d1 + 2 * d2 + 2 * d3 + d4)
 
+        # Store (x,y) values
         xList.append(x)
         yList.append(y)
 
@@ -427,16 +375,16 @@ yRange = [0.099, 0.101]
 uRange = [-0.5, -0.4]
 vRange = [-0.3, -0.2]
 tRange = [-0.01, 5]
-numSamples = 10000
+numSamples = 1000
 mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
 
-network = Fitter(numHiddenNodes=16, numHiddenLayers=1)
+network = Fitter(numHiddenNodes=16, numHiddenLayers=1, doBatchNorm = False)
 lossFn = torch.nn.MSELoss()
 optimiser = torch.optim.Adam(network.parameters(), lr=1e-3)
 trainData = DataSet(xRange, yRange, uRange, vRange, tRange, numSamples)
-loader = torch.utils.data.DataLoader(dataset=trainData, batch_size=1000, shuffle=True)
+loader = torch.utils.data.DataLoader(dataset=trainData, batch_size=100, shuffle=True)
 
 losses = [1]
 iterations = 0

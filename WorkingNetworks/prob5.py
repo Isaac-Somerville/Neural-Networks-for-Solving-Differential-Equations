@@ -12,15 +12,7 @@ class DataSet(torch.utils.data.Dataset):
         X  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True)
         Y  = torch.linspace(yrange[0],yrange[1],num_samples, requires_grad=True)
         grid = torch.meshgrid(X,Y)
-        # print(grid)
-        # print(grid[0].reshape(-1,1))
-        # print(grid[1].reshape(-1,1))
         self.data_in = torch.cat((grid[0].reshape(-1,1),grid[1].reshape(-1,1)),1)
-        #print(self.data_in.shape)
-        #tensor_data = torch.tensor(data, requires_grad=True)
-        #self.data_in = tensor_data.view(-1,2)
-        # self.data_in = torch.meshgrid(X,Y)
-        # print(self.data_in.shape)
 
     def __len__(self):
         return self.data_in.shape[0]
@@ -93,22 +85,15 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     for epoch in range(epochs+1):
         for batch in loader:
             n_out = network(batch)
-            # print(batch)
-            # print(x)
-            # print(y)
+
             dn = torch.autograd.grad(n_out, batch, torch.ones_like(n_out), retain_graph=True, create_graph=True)[0]
-            #print(dn)
             dn2 = torch.autograd.grad(dn, batch, torch.ones_like(dn), retain_graph=True, create_graph=True)[0]
-            #print(dn2)
+            
+            # Get first derivatives of NN output: dn/dx , dn/dy
             dndx, dndy = dn[:,0].view(-1,1), dn[:,1].view(-1,1)
-            # print(dndx)
-            # print(dndy)
+
+            # Get second derivatives of NN output: d^2 n / dx^2,  d^2 n / dy^2
             dndx2, dndy2 = dn2[:,0].view(-1,1), dn2[:,1].view(-1,1)
-            # print(dndx2)
-            # print(dndy2)
-            # dndx2 = torch.autograd.grad(dndx, x, torch.ones_like(dndx), retain_graph=True, create_graph=True)[0]
-            # dndy = torch.autograd.grad(n_out, y, torch.ones_like(n_out), retain_graph=True, create_graph=True)[0]
-            # dndy2 = torch.autograd.grad(dndy, y, torch.ones_like(dndy), retain_graph=True, create_graph=True)[0]
 
             x, y = batch[:,0].view(-1,1), batch[:,1].view(-1,1)
             # Get value of trial solution f_{xx}(x,y) and f_{yy}(x,y)
@@ -143,23 +128,24 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     X  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True)
     Y  = torch.linspace(yrange[0],yrange[1],num_samples, requires_grad=True)
     x,y = torch.meshgrid(X,Y)
-    input = torch.cat((x.reshape(-1,1),y.reshape(-1,1)),1)
-    # print(x.reshape(-1,1))
-    # print(y.reshape(-1,1))
-    #data = [[[x,y] for y in Y] for x in X]
-    #input = torch.tensor(data, requires_grad=True).view(-1,2)
-    #print(input)
-    N = network.forward(input)
-    output = diffEq.trial(x.reshape(-1,1),y.reshape(-1,1),N)
-    # print(N)
-    output = output.reshape(num_samples,num_samples).detach().numpy()
-    # print(x)
-    # print(y)s
-    # print(N)
 
+    # Format input into correct shape
+    input = torch.cat((x.reshape(-1,1),y.reshape(-1,1)),1)
+
+    # Get output of neural network
+    N = network.forward(input)
+
+    # Get trial solution, put into correct shape
+    output = diffEq.trial(x.reshape(-1,1),y.reshape(-1,1),N)
+    output = output.reshape(num_samples,num_samples).detach().numpy()
+
+    # Get exact solution
     exact = diffEq.solution(x,y).detach().numpy()
+
+    # Calculate residual error
     print("mean square difference between trial and exact solution = ", ((output-exact)**2).mean()) 
 
+    # Plot both trial and exact solutions
     x = x.detach().numpy()
     y = y.detach().numpy()
     ax = plt.axes(projection='3d')

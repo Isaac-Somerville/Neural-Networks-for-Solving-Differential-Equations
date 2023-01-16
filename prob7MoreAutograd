@@ -18,7 +18,7 @@ class DataSet(torch.utils.data.Dataset):
         x, y = torch.meshgrid(X, Y)
 
         # input of forward function must have shape (batch_size, 2)
-        self.data_in = torch.cat((x.reshape(-1, 1), y.reshape(-1, 1)), 1)
+        # self.data_in = torch.cat((x.reshape(-1, 1), y.reshape(-1, 1)), 1)
 
     def __len__(self):
         return self.data_in.shape[0]
@@ -73,11 +73,10 @@ class DiffEq:
             y,
             torch.ones_like(dy_trial),
             create_graph=True,
-            retain_graph=True,
-            allow_unused=True,
+            retain_graph=True
         )[0]
-        if dy2_trial == None:
-            dy2_trial = torch.zeros_like(dy_trial, requires_grad=True)
+        # if dy2_trial == None:
+        #     dy2_trial = torch.zeros_like(dy_trial, requires_grad=True)
         # print(dy2_trial)
         RHS = (2 - (np.pi * y) ** 2) * torch.sin(np.pi * x)
         return dx2_trial + dy2_trial - RHS
@@ -90,20 +89,24 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     for epoch in range(epochs + 1):
         for batch in loader:
 
-            # TODO: FIX DERIVATIVES HERE
             # x, y = batch[:, 0].view(-1, 1), batch[:, 1].view(-1, 1)
             n_xy = network(batch).view(-1, 1)
             x,y = torch.split(batch,1,1)
+            print(batch)
+            print(x)
 
             y1 = torch.ones_like(y, requires_grad=True)
             xy1 = torch.cat((x, y1), 1)
             n_xy1 = network(xy1).view(-1, 1)
-            d_n_xy1 = grad(n_xy1, xy1, torch.ones_like(n_xy1), create_graph=True)[0]
+            # d_n_xy1 = grad(n_xy1, xy1, torch.ones_like(n_xy1), create_graph=True)[0]
             # print(d_n_xy1.shape)
             # print(d_n_xy1)
-            dx_n_xy1, dy_n_xy1 = torch.split(d_n_xy1,1,1)
+            # dx_n_xy1, dy_n_xy1 = torch.split(d_n_xy1,1,1)
             # print(d_n_xy1)
             # print(dy_n_xy1)
+
+            dy_n_xy1 = grad(n_xy1, y1, torch.ones_like(n_xy1), create_graph=True)[0]
+            print(dy_n_xy1)
 
             # Get value of trial solution f(x,y)
             trial = diffEq.trial(x, y, n_xy, n_xy1, dy_n_xy1)
@@ -144,8 +147,9 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     y1 = torch.ones_like(y, requires_grad=True)
     xy1 = torch.cat((x, y1), 1)
     n_xy1 = network.forward(xy1)
-    d_n_xy1 = grad(n_xy1, xy1, torch.ones_like(n_xy1), create_graph=True)[0]
-    dy_n_xy1 = d_n_xy1[:, 1].view(-1, 1)
+    # d_n_xy1 = grad(n_xy1, xy1, torch.ones_like(n_xy1), create_graph=True)[0]
+    # dy_n_xy1 = d_n_xy1[:, 1].view(-1, 1)
+    dy_n_xy1 = grad(n_xy1, y1, torch.ones_like(n_xy1), create_graph=True)[0]
 
     trial = diffEq.trial(x, y, n_xy, n_xy1, dy_n_xy1)
     exact = diffEq.solution(x, y).detach().numpy()
