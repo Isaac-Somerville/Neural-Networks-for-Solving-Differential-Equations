@@ -88,7 +88,6 @@ def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
     network.train(True)
     for epoch in range(epochs + 1):
         for batch in loader:
-
             # x, y = batch[:, 0].view(-1, 1), batch[:, 1].view(-1, 1)
             n_xy = network(batch).view(-1, 1)
             x,y = torch.split(batch,1,1)

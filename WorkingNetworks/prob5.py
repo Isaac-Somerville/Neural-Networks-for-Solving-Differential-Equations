@@ -45,7 +45,7 @@ class DiffEq():
 
     def solution(self,x,y):
         return torch.exp(-x) * (x + y**3)
-
+    
     def trial_term(self,x,y):
         """
         First term in trial solution that helps to satisfy BCs
@@ -161,9 +161,6 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
     #ax.view_init(30, 315)
     plt.show()
     return surfaceLoss
-
-
-
 
 # lrs = [(i * 1e-3) for i in range(1,11)]
 # lrs = [(5e-3 + i * 1e-3) for i in range(1,11)]

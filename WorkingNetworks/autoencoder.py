@@ -68,9 +68,11 @@ def train(model, loader, loss_fn, optimiser, epochs):
     print(" loss = ", loss.item())
     return losses
 
-if torch.cuda.is_available() and False:
+if torch.cuda.is_available():
+    print("cuda time")
     device=torch.device("cuda")
 else:
+    print("sorry no cuda for yuda")
     device=torch.device("cpu")
     
 alpha        = math.pi/4.0

@@ -40,20 +40,25 @@ class Fitter(torch.nn.Module):
             for _ in range(numHiddenLayers)
         ]
         self.doBatchNorm = doBatchNorm
+
         if doBatchNorm:
+            # Implements batch normalisation for each hidden layer
             self.batchNorms = [
                 torch.nn.BatchNorm1d(num_features = numHiddenNodes) 
                 for _ in range(numHiddenLayers)
             ]
+        
         self.fcLast = torch.nn.Linear(numHiddenNodes, 4)
 
     def forward(self, input):
         hidden = torch.tanh(self.fc1(input))
         for i in range(len(self.fcs)):
             if self.doBatchNorm:
+                # Implement batch normalisation, then use activation function
                 hiddenNormed = self.batchNorms[i](self.fcs[i](hidden))
                 hidden = torch.tanh(hiddenNormed)
             else:
+                # Just use activation function
                 hidden = torch.tanh(self.fcs[i](hidden))
         out = self.fcLast(hidden)
         return out
@@ -71,40 +76,73 @@ class DiffEq:
         self.mu = mu
 
     def xTrial(self, xOut, t):
+        """
+        Trial solution for x(t)
+        """
         return self.x + (1 - torch.exp(-t)) * xOut
 
     def yTrial(self, yOut, t):
+        """
+        Trial solution for y(t)
+        """
         return self.y + (1 - torch.exp(-t)) * yOut
 
     def uTrial(self, uOut, t):
+        """
+        Trial solution for u(t)
+        """
         return self.u + (1 - torch.exp(-t)) * uOut
 
     def vTrial(self, vOut, t):
+        """
+        Trial solution for v(t)
+        """        
         return self.v + (1 - torch.exp(-t)) * vOut
 
     def dxTrial(self, xOut, dxOut, t):
+        """
+        Derivative of trial solution for x(t)
+        """
         return ((1 - torch.exp(-t)) * dxOut) + (torch.exp(-t) * xOut)
 
     def dyTrial(self, yOut, dyOut, t):
+        """
+        Derivative of trial solution for y(t)
+        """
         return ((1 - torch.exp(-t)) * dyOut) + (torch.exp(-t) * yOut)
 
     def duTrial(self, uOut, duOut, t):
+        """
+        Derivative of trial solution for u(t)
+        """
         return ((1 - torch.exp(-t)) * duOut) + (torch.exp(-t) * uOut)
 
     def dvTrial(self, vOut, dvOut, t):
+        """
+        Derivative of trial solution for v(t)
+        """
         return ((1 - torch.exp(-t)) * dvOut) + (torch.exp(-t) * vOut)
 
     def dxEq(self, uOut, xOut, dxOut, t):
+        """
+        Returns LHS of differential equation for x(t)
+        """
         u = self.uTrial(uOut, t)
         dxTrial = self.dxTrial(xOut, dxOut, t)
         return dxTrial - u
 
     def dyEq(self, vOut, yOut, dyOut, t):
+        """
+        Returns LHS of differential equation for y(t)
+        """
         v = self.vTrial(vOut, t)
         dyTrial = self.dyTrial(yOut, dyOut, t)
         return dyTrial - v
 
     def duEq(self, xOut, yOut, vOut, uOut, duOut, t):
+        """
+        Returns LHS of differential equation for u(t)
+        """
         x = self.xTrial(xOut, t)
         y = self.yTrial(yOut, t)
         v = self.vTrial(vOut, t)
@@ -120,6 +158,9 @@ class DiffEq:
         )
 
     def dvEq(self, xOut, yOut, uOut, vOut, dvOut, t):
+        """
+        Returns LHS of differential equation for v(t)
+        """
         x = self.xTrial(xOut, t)
         y = self.yTrial(yOut, t)
         u = self.uTrial(uOut, t)
@@ -132,12 +173,6 @@ class DiffEq:
                 + (((1 - self.mu) * y) / (x**2 + y**2) ** (3 / 2))
             )
         )
-                
-
-    # def totalDiffEq(self,xOut,yOut,uOut,vOut,t):
-    #     return (self.dxEq(uOut,xOut,t) + self.dyEq(vOut,yOut,t) 
-    #             + self.duEq(xOut,yOut,vOut,uOut,t)
-    #             + self.dvEq(xOut,yOut,uOut,vOut,t))
 
 def train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRange,tRange,
             numSamples, mu, lmbda, epochs, iterations, numTimeSteps):
@@ -145,12 +180,16 @@ def train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRan
     costList=[]
     network.train(True)
     batch = data.data_in
+
+    # Equally-spaced t-values for fixed starting conditions x0, y0, u0, v0
     t = torch.linspace(tRange[0],tRange[1],numTimeSteps,requires_grad=True).view(-1,1)
     x = torch.tensor([batch[0][0] for _ in range(numTimeSteps)]).view(-1,1)
     y = torch.tensor([batch[0][1] for _ in range(numTimeSteps)]).view(-1,1)
     u = torch.tensor([batch[0][2] for _ in range(numTimeSteps)]).view(-1,1)
     v = torch.tensor([batch[0][3] for _ in range(numTimeSteps)]).view(-1,1)
     diffEq = DiffEq(x, y, u, v, mu)
+
+    # Create input data
     input = torch.cat((x,y,u,v,t),dim=1)
     for epoch in range(epochs+1):
         # print(x)
@@ -161,9 +200,9 @@ def train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRan
 
         # NN outputs
         out = network.forward(input)
+        xOut, yOut, uOut, vOut = torch.split(out, 1, dim = 1)
         # print(out)
         # print(out.shape)
-        xOut, yOut, uOut, vOut = torch.split(out, 1, dim = 1)
         # print(xOut)
         # print(yOut)
         # print(uOut)
@@ -187,16 +226,31 @@ def train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRan
         dyEq = diffEq.dyEq(vOut, yOut, dyOut, t)
         duEq = diffEq.duEq(xOut, yOut, vOut, uOut, duOut, t)
         dvEq = diffEq.dvEq(xOut, yOut, uOut, vOut, dvOut, t)
-        dxLoss = lossFn(torch.exp(-lmbda * t) * dxEq, torch.zeros_like(dxEq))
-        dyLoss = lossFn(torch.exp(-lmbda * t) * dyEq, torch.zeros_like(dyEq))
-        duLoss = lossFn(torch.exp(-lmbda * t) * duEq, torch.zeros_like(duEq))
-        dvLoss = lossFn(torch.exp(-lmbda * t) * dvEq, torch.zeros_like(dvEq))
+        # dxLoss = lossFn(torch.exp(-lmbda * t) * dxEq, torch.zeros_like(dxEq))
+        # dyLoss = lossFn(torch.exp(-lmbda * t) * dyEq, torch.zeros_like(dyEq))
+        # duLoss = lossFn(torch.exp(-lmbda * t) * duEq, torch.zeros_like(duEq))
+        # dvLoss = lossFn(torch.exp(-lmbda * t) * dvEq, torch.zeros_like(dvEq))
+        dxLoss = lossFn(dxEq, torch.zeros_like(dxEq))
+        dyLoss = lossFn(dyEq, torch.zeros_like(dyEq))
+        duLoss = lossFn(duEq, torch.zeros_like(duEq))
+        dvLoss = lossFn(dvEq, torch.zeros_like(dvEq))
         loss = (dxLoss + dyLoss + duLoss + dvLoss)
 
         # optimisation
         loss.backward()
         optimiser.step()
-        optimiser.zero_grad()
+        
+        # reset grads to zero
+        # optimiser.zero_grad()
+
+        # reset grads to None (uses less memory operations)      
+        # optimiser.zero_grad(set_to_none = True)
+
+        # reset grads to None (uses less memory operations)  
+        for param in network.parameters():
+            param.grad = None
+
+        # update scheduler, tracks loss and update learning rate if on plateau   
         scheduler.step(loss)
 
         #store final loss of each epoch
@@ -206,14 +260,6 @@ def train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRan
             plotNetwork(network, data, mu, epoch, epochs, iterations, 
                         xRange, yRange, uRange,vRange,tRange, numTimeSteps)
             print("current loss = ", loss.detach().numpy())
-            plt.semilogy(costList)
-            plt.xlabel("Epochs")
-            plt.ylabel("Log of Loss")
-            plt.title("Loss")
-            plt.show()
-
-        #store final loss of each epoch
-        costList.append(loss.detach().numpy())
 
     network.train(False)
     return costList
@@ -222,19 +268,27 @@ def plotNetwork(network, data, mu, epoch, epochs, iterations,
                 xRange, yRange,uRange,vRange,tRange, numTimeSteps):
     timeStep = (tRange[1] - tRange[0]) / numTimeSteps
     batch = data.data_in
-    t = torch.linspace(tRange[0],tRange[1],numTimeSteps,requires_grad=True).view(-1,1)
+    t = torch.linspace(tRange[0],tRange[1],numTimeSteps,requires_grad=False).view(-1,1)
 
     for i in range(len(batch)):
         x = torch.tensor([batch[i][0] for _ in range(numTimeSteps)]).view(-1,1)
         y = torch.tensor([batch[i][1] for _ in range(numTimeSteps)]).view(-1,1)
         u = torch.tensor([batch[i][2] for _ in range(numTimeSteps)]).view(-1,1)
         v = torch.tensor([batch[i][3] for _ in range(numTimeSteps)]).view(-1,1)
+        x.requires_grad = False
+        y.requires_grad = False
+        u.requires_grad = False
+        v.requires_grad = False
         diffEq = DiffEq(x, y, u, v, mu)
         input = torch.cat((x,y,u,v,t),dim=1)
+
+        # Get NN output
         out = network.forward(input)
         # print(out)
         # print(out.shape)
         xOut, yOut, uOut, vOut = torch.split(out, 1, dim = 1)
+
+        # Get trial solutions from NN output
         xTrial = diffEq.xTrial(xOut,t).detach().numpy()
         yTrial = diffEq.yTrial(yOut,t).detach().numpy()
         # print(xTrial)
@@ -338,13 +392,13 @@ mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
 
-network    = Fitter(numHiddenNodes=32, numHiddenLayers=1, doBatchNorm=False)
+network    = Fitter(numHiddenNodes=32, numHiddenLayers=4, doBatchNorm=False)
 lossFn    = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimiser, 
         factor=0.1, 
-        patience=1000, 
+        patience=500, 
         threshold=1e-4, 
         cooldown=0, 
         min_lr=0, 
@@ -354,15 +408,26 @@ data = DataSet(xRange,yRange,uRange,vRange,tRange,1)
 
 losses = [1]
 iterations = 0
-epochs = 1000
-while iterations < 100:
-    newLoss = train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRange,tRange,
-            numSamples, mu, lmbda, epochs, iterations, numTimeSteps)
-    losses.extend(newLoss)
-    iterations += 1
-print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
-plt.semilogy(losses)
-plt.xlabel("Epochs")
-plt.ylabel("Log of Loss")
-plt.title("Loss")
-plt.show()
+epochs = 10000
+tRanges = [[-0.01,1], [1,2], [2,3], [3,4], [4,5], [-0.01, 5]]
+for tRange in tRanges:
+    while iterations < 2:
+        # reset learning rate to 1e-2
+        for g in optimiser.param_groups:
+            g['lr'] = 1e-2
+        newLoss = train(network, lossFn, optimiser, scheduler, data, 
+                        xRange,yRange,uRange,vRange,tRange, numSamples,
+                        mu, lmbda, epochs, iterations, numTimeSteps)
+        losses.extend(newLoss)
+        plt.semilogy(losses)
+        plt.xlabel("Epochs")
+        plt.ylabel("Loss")
+        plt.title("Loss")
+        plt.show()
+        iterations += 1
+    print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+
+# TO TRY:
+# Curriculumn learning
+# lr = 1e-1, 5e-2
+# %%
