@@ -5,6 +5,7 @@ Not something totally new, but adjacent
 E.g. play around with boundary conditions / parameters in existing examples
 
 3 body problem, using a GPU:
+Curriculumn learning setting end of subinterval as new ICs
 KP will ask about it
 
 Parameter inference

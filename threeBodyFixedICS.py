@@ -301,7 +301,7 @@ def plotNetwork(network, data, mu, epoch, epochs, iterations,
         u0 = batch[i][2].item()
         v0 = batch[i][3].item()
         xExact, yExact = rungeKutta(x0, y0, u0, v0, tRange[0], mu, tRange[1], timeStep)
-
+        # xExact, yExact = rungeKutta(x0, y0, u0, v0, -0.01, mu, 5, (5-(-0.01)) / numTimeSteps) 
         plt.plot(xExact, yExact, color = 'r')
 
     plt.plot([0.],[0.], marker = '.', markersize = 40)
@@ -392,7 +392,7 @@ mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
 
-network    = Fitter(numHiddenNodes=32, numHiddenLayers=4, doBatchNorm=False)
+network    = Fitter(numHiddenNodes=32, numHiddenLayers=8, doBatchNorm=False)
 lossFn    = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -406,25 +406,39 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         verbose=True)
 data = DataSet(xRange,yRange,uRange,vRange,tRange,1)
 
-losses = [1]
-iterations = 0
+totalLosses = []
 epochs = 10000
-tRanges = [[-0.01,1], [1,2], [2,3], [3,4], [4,5], [-0.01, 5]]
+#tRanges = [[-0.01,1], [1,2], [2,3], [3,4], [4,5], [-0.01, 5]]
+tRanges = [[-0.01,1], [-0.01,2], [-0.01,3], [-0.01,4], [-0.01,5]]
 for tRange in tRanges:
-    while iterations < 2:
-        # reset learning rate to 1e-2
-        for g in optimiser.param_groups:
-            g['lr'] = 1e-2
+    iterations = 0
+    losses = [1]
+    # reset learning rate to 1e-2
+    for g in optimiser.param_groups:
+        g['lr'] = 1e-2
+    # reset scheduler
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimiser, 
+        factor=0.1, 
+        patience=500, 
+        threshold=1e-4, 
+        cooldown=0, 
+        min_lr=0, 
+        eps=1e-8, 
+        verbose=True
+        )
+    while iterations < 10 and losses[-1] > 1e-5:
         newLoss = train(network, lossFn, optimiser, scheduler, data, 
                         xRange,yRange,uRange,vRange,tRange, numSamples,
                         mu, lmbda, epochs, iterations, numTimeSteps)
         losses.extend(newLoss)
-        plt.semilogy(losses)
+        plt.semilogy(losses[1:])
         plt.xlabel("Epochs")
         plt.ylabel("Loss")
         plt.title("Loss")
         plt.show()
         iterations += 1
+    totalLosses.extend(losses[1:])
     print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
 
 # TO TRY:

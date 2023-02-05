@@ -14,9 +14,8 @@ x = torch.tensor(data['x'].flatten()[:,None])
 Exact = np.real(data['usol']).T
 
 X, T = np.meshgrid(x,t)
-
-X = torch.tensor(X)
-T = torch.tensor(T)
+print(X.shape)
+print(T.shape)
 
 X_star = np.hstack((X.flatten()[:,None], T.flatten()[:,None]))
 u_star = Exact.flatten()[:,None]   
