@@ -44,7 +44,7 @@ class DiffEq():
         
     def solution1(self, x):
         """Analytic solution to first DE"""
-        return torch.sin(3*x)
+        return torch.sin(x)
     
     def f1_trial(self, x, n1_out):
         """Trial solution f1(x) to first DE"""
@@ -56,7 +56,7 @@ class DiffEq():
     
     def solution2(self, x):
         """Analytic solution to second DE"""
-        return 1 + (3*x)**2
+        return 1 + (x)**2
     
     def f2_trial(self, x, n2_out):
         """Trial solution f2(x) to second DE"""
@@ -69,13 +69,13 @@ class DiffEq():
     def diffEq1(self, x, f1_trial, f2_trial, df1_trial):
         """Returns D1(x) where first DE is D1(x) = 0"""
         LHS = df1_trial
-        RHS = 3 * (torch.cos(3*x) + ((f1_trial)**2 + f2_trial - (1 + (3*x)**2 + (torch.sin(3*x))**2)))
+        RHS = (torch.cos(x) + ((f1_trial)**2 + f2_trial - (1 + (x)**2 + (torch.sin(x))**2)))
         return LHS - RHS
     
     def diffEq2(self, x, f1_trial, f2_trial, df2_trial):
         """Returns D2(x) where second DE is D2(x) = 0"""
         LHS = df2_trial
-        RHS = 3 * (2*3*x + ((-(1 + (3*x)**2)*torch.sin(3*x)) + (f1_trial*f2_trial)))
+        RHS = (2*x + ((-(1 + (x)**2)*torch.sin(x)) + (f1_trial*f2_trial)))
         return LHS - RHS
 
 def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
@@ -134,31 +134,32 @@ def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange):
     exact1 = diffEq.solution1(x).detach().numpy()
     exact2 = diffEq.solution2(x).detach().numpy()
     
-    plt.plot(x, diffEq.f1_trial(x,N1), 'r-', label = "Neural Network 1 Output")
-    plt.plot(x, exact1, 'b.', label = "True Solution")
+    plt.plot(x, diffEq.f1_trial(x,N1), 'r-', label = "f(x) Trial Solution")
+    plt.plot(x, exact1, 'g.', label = "f(x) Exact Solution")
     
-    plt.xlabel("x")
-    plt.ylabel("f1(x)")
-    plt.legend(loc = "lower center")
-    plt.title("Network 1: " + str(epoch + iterations*epochs) + " Epochs")
-    plt.show()
+    # plt.xlabel("x")
+    # plt.ylabel("y")
+    # plt.legend(loc = "lower center")
+    # plt.title("Network 1: " + str(epoch + iterations*epochs) + " Epochs")
+    # plt.show()
     
-    plt.plot(x, diffEq.f2_trial(x,N2), 'r-', label = "Neural Network 2 Output")
-    plt.plot(x, exact2, 'b.', label = "True Solution")
+    plt.plot(x, diffEq.f2_trial(x,N2), 'm-', label = "g(x) Trial Solution")
+    plt.plot(x, exact2, 'c.', label = "g(x) Exact Solution")
     
-    plt.xlabel("x")
-    plt.ylabel("f2(x)")
-    plt.legend(loc = "upper left")
-    plt.title("Network 2: " + str(epoch + iterations*epochs) + " Epochs")
+    plt.xlabel("x",fontsize = 16)
+    plt.ylabel("y",fontsize = 16)
+    plt.legend(loc = "upper left",fontsize = 16)
+    plt.title(str(epoch + iterations*epochs) + " Epochs",fontsize = 16)
     plt.show()
 
 network     = Fitter(num_hidden_nodes=32)
 loss_fn      = torch.nn.MSELoss()
-optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
+optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-3)
 
 # ranges = [[0., 0.25], [0.25,0.5],[0.5,0.75], [0.75,1.], [0,1]]
 # succeeds
  
+
 # ranges = [[0.75,1.],[0.5,0.75], [0.25,0.5],[0., 0.25],[0,1]]
 # succeeds 
 
@@ -177,7 +178,13 @@ optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 # ranges = [ [0.66,1],[0.33,0.66], [0,0.33], [0,1]]
 # succeeds
 
-ranges = [[0,1]]
+# ranges = [[0,3]]
+# fails
+
+ranges = [[0,1],[0,2],[0,3]]
+# succeeds
+
+# ranges = [[0,1.5], [0,3]]
 # fails
 
 allLosses = []
@@ -190,12 +197,12 @@ for i in range(len(ranges)):
         num_samples = 15
     diffEq = DiffEq(xrange, num_samples)
     train_set    = DataSet(xrange, num_samples)
-    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=30, shuffle=True)
+    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=num_samples, shuffle=True)
 
     losses = [1]
     iterations = 0
-    epochs = 5000
-    while losses[-1] > 0.001  and iterations < 10:
+    epochs = 1000
+    while losses[-1] > 1e-4  and iterations < 50:
         newLoss = train(network, train_loader, loss_fn,
                             optimiser, diffEq, epochs, iterations)
         losses.extend(newLoss)
@@ -207,14 +214,15 @@ for i in range(len(ranges)):
 
     plt.semilogy(losses)
     plt.xlabel("Epochs")
-    plt.ylabel("Log of Loss")
-    plt.title("Loss")
+    plt.ylabel("Error")
+    plt.title("Error")
     plt.show()
 
 plt.semilogy(allLosses)
-plt.xlabel("Epochs")
-plt.ylabel("Log of Loss")
-plt.title("Loss")
+plt.xlabel("Epochs", fontsize = 16)
+plt.ylabel("Error", fontsize = 16)
+plt.title("Error", fontsize = 16)
 plt.show()
-plotNetwork(network, diffEq, totalEpochs, 0, 0, [0,1])
+plotNetwork(network, diffEq, totalEpochs, 0, 0, [0,3])
 # %%
+

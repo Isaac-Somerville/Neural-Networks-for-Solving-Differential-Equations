@@ -11,7 +11,7 @@ import scipy.io
 class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x- and y-coordinates as test data"""
     def __init__(self, XT, u_exact, numSamples):
-        # generate numSamples random indices to get training samples
+        # generate numSamples random indices to get training sample
         idx = np.random.choice(XT.shape[0], numSamples, replace=False) 
 
         XT_train = torch.tensor(XT[idx,:], requires_grad=True).float()
@@ -23,6 +23,7 @@ class DataSet(torch.utils.data.Dataset):
     def __len__(self):
         return self.data_in.shape[0]
 
+
     def __getitem__(self, i):
         return self.data_in[i,:]
 
@@ -33,10 +34,8 @@ class Fitter(torch.nn.Module):
         super(Fitter, self).__init__()
         # 3 inputs: x, t, u values
         self.fc1 = torch.nn.Linear(3, numHiddenNodes)
-        self.fcs = [
-            torch.nn.Linear(numHiddenNodes, numHiddenNodes)
-            for _ in range(numHiddenLayers)
-        ]
+        self.fcs = torch.nn.ModuleList([torch.nn.Linear(numHiddenNodes, numHiddenNodes)
+                    for _ in range(numHiddenLayers)])
         # 1 outputs : u
         self.fcLast = torch.nn.Linear(numHiddenNodes, 1)
 
@@ -82,7 +81,8 @@ def train(network, lossFn, optimiser, scheduler, loader, epochs,
             # print(network.lambda1)
             # print(network.lambda2)
 
-            diffEqLHS = diffEq(u_out, u_t, u_x, u_xx, network.lambda1, network.lambda2)
+            # diffEqLHS = diffEq(u_out, u_t, u_x, u_xx, network.lambda1, network.lambda2)
+            diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
 
             batch_u_exact = batch[:,2].view(-1,1)
             # print(u_exact)
@@ -96,14 +96,14 @@ def train(network, lossFn, optimiser, scheduler, loader, epochs,
             optimiser.step()
             optimiser.zero_grad()
 
-            # update scheduler, tracks loss and update learning rate if on plateau   
-            scheduler.step(loss)
+        # update scheduler, tracks loss and update learning rate if on plateau   
+        scheduler.step(loss)
 
-            #store final loss of each epoch
-            costList.append(loss.detach().numpy())
+        #store final loss of each epoch
+        costList.append(loss.detach().numpy())
 
         if epoch == epochs:
-            test(network, XT, u_exact, lossFn)
+            # test(network, XT, u_exact, lossFn)
             plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations)
             print("u_train loss = ", uLoss.item())
             print("DE_train loss = ", DELoss.item())
@@ -192,10 +192,12 @@ u_exact = Exact.flatten()[:,None]
 # print(u_exact.shape)
 
 numSamples = 2000
-network    = Fitter(numHiddenNodes=16, numHiddenLayers=8)
+network    = Fitter(numHiddenNodes=64, numHiddenLayers=4)
 trainData = DataSet(XT, u_exact, numSamples)
-trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples/4), shuffle=True)
+trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples), shuffle=True)
 lossFn   = torch.nn.MSELoss()
+for n in network.parameters():
+    print(n)
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimiser, 
@@ -211,7 +213,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 losses = [1]
 iterations = 0
 epochs = 1000
-while iterations < 10:
+while iterations < 4:
     newLoss = train(network, lossFn, optimiser, scheduler, trainLoader, 
                     epochs, iterations, X, T, XT, u_exact)
     losses.extend(newLoss)

@@ -35,10 +35,8 @@ class Fitter(torch.nn.Module):
     def __init__(self, numHiddenNodes, numHiddenLayers, doBatchNorm):
         super(Fitter, self).__init__()
         self.fc1 = torch.nn.Linear(5, numHiddenNodes)
-        self.fcs = [
-            torch.nn.Linear(numHiddenNodes, numHiddenNodes)
-            for _ in range(numHiddenLayers)
-        ]
+        self.fcs = torch.nn.ModuleList([torch.nn.Linear(numHiddenNodes, numHiddenNodes)
+                    for _ in range(numHiddenLayers)])
         self.doBatchNorm = doBatchNorm
 
         if doBatchNorm:
@@ -226,14 +224,14 @@ def train(network, lossFn, optimiser, scheduler, data, xRange,yRange,uRange,vRan
         dyEq = diffEq.dyEq(vOut, yOut, dyOut, t)
         duEq = diffEq.duEq(xOut, yOut, vOut, uOut, duOut, t)
         dvEq = diffEq.dvEq(xOut, yOut, uOut, vOut, dvOut, t)
-        # dxLoss = lossFn(torch.exp(-lmbda * t) * dxEq, torch.zeros_like(dxEq))
-        # dyLoss = lossFn(torch.exp(-lmbda * t) * dyEq, torch.zeros_like(dyEq))
-        # duLoss = lossFn(torch.exp(-lmbda * t) * duEq, torch.zeros_like(duEq))
-        # dvLoss = lossFn(torch.exp(-lmbda * t) * dvEq, torch.zeros_like(dvEq))
-        dxLoss = lossFn(dxEq, torch.zeros_like(dxEq))
-        dyLoss = lossFn(dyEq, torch.zeros_like(dyEq))
-        duLoss = lossFn(duEq, torch.zeros_like(duEq))
-        dvLoss = lossFn(dvEq, torch.zeros_like(dvEq))
+        dxLoss = lossFn(torch.exp(-lmbda * t) * dxEq, torch.zeros_like(dxEq))
+        dyLoss = lossFn(torch.exp(-lmbda * t) * dyEq, torch.zeros_like(dyEq))
+        duLoss = lossFn(torch.exp(-lmbda * t) * duEq, torch.zeros_like(duEq))
+        dvLoss = lossFn(torch.exp(-lmbda * t) * dvEq, torch.zeros_like(dvEq))
+        # dxLoss = lossFn(dxEq, torch.zeros_like(dxEq))
+        # dyLoss = lossFn(dyEq, torch.zeros_like(dyEq))
+        # duLoss = lossFn(duEq, torch.zeros_like(duEq))
+        # dvLoss = lossFn(dvEq, torch.zeros_like(dvEq))
         loss = (dxLoss + dyLoss + duLoss + dvLoss)
 
         # optimisation
@@ -392,14 +390,14 @@ mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
 
-network    = Fitter(numHiddenNodes=32, numHiddenLayers=8, doBatchNorm=False)
+network    = Fitter(numHiddenNodes=32, numHiddenLayers=4, doBatchNorm=False)
 lossFn    = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimiser, 
         factor=0.1, 
         patience=500, 
-        threshold=1e-4, 
+        threshold=1e-4,
         cooldown=0, 
         min_lr=0, 
         eps=1e-8, 
@@ -407,9 +405,10 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 data = DataSet(xRange,yRange,uRange,vRange,tRange,1)
 
 totalLosses = []
-epochs = 10000
+epochs = 1000
 #tRanges = [[-0.01,1], [1,2], [2,3], [3,4], [4,5], [-0.01, 5]]
-tRanges = [[-0.01,1], [-0.01,2], [-0.01,3], [-0.01,4], [-0.01,5]]
+# tRanges = [[-0.01,1], [-0.01,2], [-0.01,3], [-0.01,4], [-0.01,5]]
+tRanges = [[-0.01,5]]
 for tRange in tRanges:
     iterations = 0
     losses = [1]
@@ -427,7 +426,7 @@ for tRange in tRanges:
         eps=1e-8, 
         verbose=True
         )
-    while iterations < 10 and losses[-1] > 1e-5:
+    while iterations < 100:
         newLoss = train(network, lossFn, optimiser, scheduler, data, 
                         xRange,yRange,uRange,vRange,tRange, numSamples,
                         mu, lmbda, epochs, iterations, numTimeSteps)
