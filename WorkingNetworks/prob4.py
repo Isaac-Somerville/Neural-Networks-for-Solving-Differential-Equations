@@ -191,10 +191,15 @@ allLosses = []
 totalEpochs = 0
 for i in range(len(ranges)):
     xrange = ranges[i]
-    if i == len(ranges) - 1:
-        num_samples = 30
-    else:
-        num_samples = 15
+    # if i == len(ranges) - 1:
+    #     num_samples = 30
+    # else:
+    #     num_samples = 15
+    
+    # num_samples = 30
+
+    num_samples = int(10 * (i+1) + 1)
+
     diffEq = DiffEq(xrange, num_samples)
     train_set    = DataSet(xrange, num_samples)
     train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=num_samples, shuffle=True)
@@ -202,7 +207,7 @@ for i in range(len(ranges)):
     losses = [1]
     iterations = 0
     epochs = 1000
-    while losses[-1] > 1e-4  and iterations < 50:
+    while losses[-1] > 5e-4  and iterations < 50:
         newLoss = train(network, train_loader, loss_fn,
                             optimiser, diffEq, epochs, iterations)
         losses.extend(newLoss)

@@ -6,33 +6,34 @@ import torch
 # import torch.optim as optim
 import numpy as np
 import scipy.io
+import matplotlib.pyplot as plt
 
-data = scipy.io.loadmat('burgersData.mat')
+# data = scipy.io.loadmat('burgersData.mat')
 
-t = torch.tensor(data['t'].flatten()[:,None])
-x = torch.tensor(data['x'].flatten()[:,None])
-Exact = np.real(data['usol']).T
+# t = torch.tensor(data['t'].flatten()[:,None])
+# x = torch.tensor(data['x'].flatten()[:,None])
+# Exact = np.real(data['usol']).T
 
-X, T = np.meshgrid(x,t)
-print(X.shape)
-print(T.shape)
+# X, T = np.meshgrid(x,t)
+# print(X.shape)
+# print(T.shape)
 
-X_star = np.hstack((X.flatten()[:,None], T.flatten()[:,None]))
-u_star = Exact.flatten()[:,None]   
-print(t)
-print(x)
-print(Exact.shape)
-print(X)
-print(T)
-print(X_star.shape)
-print(u_star.shape)
+# X_star = np.hstack((X.flatten()[:,None], T.flatten()[:,None]))
+# u_star = Exact.flatten()[:,None]   
+# print(t)
+# print(x)
+# print(Exact.shape)
+# print(X)
+# print(T)
+# print(X_star.shape)
+# print(u_star.shape)
 
-idx = np.random.choice(X_star.shape[0], 2000, replace=False)
-X_u_train = X_star[idx,:]
-u_train = u_star[idx,:]
-print(idx)
-print(X_u_train.shape)
-print(u_train.shape)
+# idx = np.random.choice(X_star.shape[0], 2000, replace=False)
+# X_u_train = X_star[idx,:]
+# u_train = u_star[idx,:]
+# print(idx)
+# print(X_u_train.shape)
+# print(u_train.shape)
 # # x = [[1,2,3],
 # #      [4,5,6],
 # #      [7,8,9]]
@@ -137,6 +138,41 @@ print(u_train.shape)
 # print(m)
 # out.backward(m)
 # print(a.grad)
+# xrange = [-0.2,1.9]
+# yrange = [0.7,2.9]
 
+xrange = [-5,5]
+yrange = [-5,5]
+num_samples = 50
+x_lin  = torch.linspace(xrange[0],xrange[1],num_samples)
+y_lin  = torch.linspace(yrange[0],yrange[1],num_samples)
+X,Y = torch.meshgrid(x_lin,y_lin)
+x, y  = X.reshape(-1,1), Y.reshape(-1,1)
+
+def solution(x, y):
+    return -0.1 * (torch.cos(np.pi * 2*x) + torch.cos(np.pi *2* y) -x**2 - y **2) +0.2
+
+
+# Plot trial and exact solutions
+ax = plt.axes(projection='3d')
+surface = solution(X,Y)
+X = X.detach().numpy()
+Y = Y.detach().numpy()
+ax.plot_surface(X,Y,surface,rstride=1, cstride=1,
+            cmap='viridis', edgecolor='none')
+ax.view_init(35, 210)
+ax.set_ylabel('b',fontsize = 16)
+ax.set_xlabel('w', fontsize = 16)
+ax.set_title('Error Surface J(w,b)', fontsize = 16)
+plt.show()
+
+
+# %%
+
+# %%
+
+# %%
+
+# %%
 
 # %%

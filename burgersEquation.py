@@ -35,7 +35,7 @@ class Fitter(torch.nn.Module):
         # 3 inputs: x, t, u values
         self.fc1 = torch.nn.Linear(3, numHiddenNodes)
         self.fcs = torch.nn.ModuleList([torch.nn.Linear(numHiddenNodes, numHiddenNodes)
-                    for _ in range(numHiddenLayers)])
+                    for _ in range(numHiddenLayers-1)])
         # 1 outputs : u
         self.fcLast = torch.nn.Linear(numHiddenNodes, 1)
 
@@ -52,11 +52,11 @@ class Fitter(torch.nn.Module):
         out = self.fcLast(hidden)
         return out
 
-def diffEq(u, u_t, u_x, u_xx, lambda1, lambda2):
-    """
-    Returns the LHS of Burger's Equation
-    """
-    return u_t + (lambda1 * u * u_x) - (torch.exp(lambda2) * u_xx)
+# def diffEq(u, u_t, u_x, u_xx, lambda1, lambda2):
+#     """
+#     Returns the LHS of Burger's Equation
+#     """
+#     return u_t + (lambda1 * u * u_x) - (torch.exp(lambda2) * u_xx)
 
 def train(network, lossFn, optimiser, scheduler, loader, epochs, 
             iterations, X, T, XT, u_exact):
@@ -84,7 +84,8 @@ def train(network, lossFn, optimiser, scheduler, loader, epochs,
             # diffEqLHS = diffEq(u_out, u_t, u_x, u_xx, network.lambda1, network.lambda2)
             diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
 
-            batch_u_exact = batch[:,2].view(-1,1)
+            # batch_u_exact = batch[:,2].view(-1,1)
+            _, _, batch_u_exact = torch.split(batch,1, dim =1)
             # print(u_exact)
 
             uLoss = lossFn(u_out, batch_u_exact)
@@ -96,8 +97,8 @@ def train(network, lossFn, optimiser, scheduler, loader, epochs,
             optimiser.step()
             optimiser.zero_grad()
 
-        # update scheduler, tracks loss and update learning rate if on plateau   
-        scheduler.step(loss)
+        # update scheduler, tracks loss and updates learning rate if on plateau   
+        # scheduler.step(loss)
 
         #store final loss of each epoch
         costList.append(loss.detach().numpy())
@@ -173,6 +174,7 @@ def plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations):
     ax.set_title(str(epoch + iterations*epochs) + " Epochs")
     #ax.view_init(30, 315)
     plt.show()
+    return
 
 
 data = scipy.io.loadmat('burgersData.mat')
@@ -192,13 +194,14 @@ u_exact = Exact.flatten()[:,None]
 # print(u_exact.shape)
 
 numSamples = 2000
-network    = Fitter(numHiddenNodes=64, numHiddenLayers=4)
+network    = Fitter(numHiddenNodes=20, numHiddenLayers=9)
 trainData = DataSet(XT, u_exact, numSamples)
 trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples), shuffle=True)
 lossFn   = torch.nn.MSELoss()
 for n in network.parameters():
     print(n)
-optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
+# optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-4)
+optimiser = torch.optim.LBFGS(network.parameters(), lr = 1e-3)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimiser, 
     factor=0.1, 
@@ -213,7 +216,7 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 losses = [1]
 iterations = 0
 epochs = 1000
-while iterations < 4:
+while iterations < 10:
     newLoss = train(network, lossFn, optimiser, scheduler, trainLoader, 
                     epochs, iterations, X, T, XT, u_exact)
     losses.extend(newLoss)
@@ -229,3 +232,8 @@ plt.show()
 print("True value of lambda1 = ", 1.0)
 print("True value of lambda2 = ", 0.01 / np.pi)
 plotNetwork(network, X, T, XT, u_exact, 0, epochs, iterations)
+
+for n in network.parameters():
+    print(n)
+
+# %%
