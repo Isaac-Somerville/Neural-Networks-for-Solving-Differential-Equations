@@ -221,7 +221,7 @@ def train(network, lossFn, optimiser, scheduler, xRange,yRange,uRange,vRange,tRa
         optimiser.zero_grad()
 
         # update scheduler, tracks loss and update learning rate if on plateau   
-        scheduler.step(loss)
+        # scheduler.step(loss)
 
         if epoch == epochs:
             plotNetwork(network, mu, epoch, epochs, iterations, 
@@ -357,7 +357,7 @@ yRange = [0.099, 0.101]
 uRange = [-0.5,-0.4]
 vRange = [-0.3,-0.2]
 tRange = [-0.01,5]
-numSamples = 1000
+numSamples = 100
 mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
@@ -368,7 +368,7 @@ optimiser = torch.optim.Adam(network.parameters(), lr = 1e-2)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimiser, 
         factor=0.1, 
-        patience=2000, 
+        patience=500, 
         threshold=1e-4, 
         cooldown=0, 
         min_lr=0, 
@@ -379,15 +379,10 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
 losses = [1]
 iterations = 0
 epochs = 1000
-while iterations < 20:
+while iterations < 10:
     newLoss = train(network, lossFn, optimiser, scheduler, xRange,yRange,uRange,vRange,tRange,
             numSamples, mu, lmbda, epochs, iterations, numTimeSteps)
     losses.extend(newLoss)
-    plt.semilogy(losses[1:])
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.title("Loss")
-    plt.show()
     iterations += 1
 print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
 plt.semilogy(losses)

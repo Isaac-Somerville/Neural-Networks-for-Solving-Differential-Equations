@@ -390,7 +390,8 @@ mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
 
-network    = Fitter(numHiddenNodes=32, numHiddenLayers=4, doBatchNorm=False)
+# 4 layers 128 nodes works well
+network    = Fitter(numHiddenNodes=128, numHiddenLayers=8, doBatchNorm=False)
 lossFn    = torch.nn.MSELoss()
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(

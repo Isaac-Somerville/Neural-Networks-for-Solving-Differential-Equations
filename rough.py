@@ -138,11 +138,11 @@ import matplotlib.pyplot as plt
 # print(m)
 # out.backward(m)
 # print(a.grad)
-# xrange = [-0.2,1.9]
-# yrange = [0.7,2.9]
+xrange = [-0.2,1.9]
+yrange = [0.7,2.9]
 
-xrange = [-5,5]
-yrange = [-5,5]
+# xrange = [-5,5]
+# yrange = [-5,5]
 num_samples = 50
 x_lin  = torch.linspace(xrange[0],xrange[1],num_samples)
 y_lin  = torch.linspace(yrange[0],yrange[1],num_samples)
