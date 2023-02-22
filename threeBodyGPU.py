@@ -9,11 +9,12 @@ from torch.autograd import grad
 class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x- and y-coordinates as test data"""
     def __init__(self, xRange, yRange, uRange, vRange, tRange, numSamples):
-        X = torch.distributions.uniform.Uniform(xRange[0],xRange[1]).sample([numSamples,1])
-        Y = torch.distributions.uniform.Uniform(yRange[0],yRange[1]).sample([numSamples,1])
-        U = torch.distributions.uniform.Uniform(uRange[0],uRange[1]).sample([numSamples,1])
-        V = torch.distributions.uniform.Uniform(vRange[0],vRange[1]).sample([numSamples,1])
-        T = torch.distributions.uniform.Uniform(tRange[0],tRange[1]).sample([numSamples,1])
+        global device
+        X = torch.distributions.uniform.Uniform(xRange[0],xRange[1]).sample([numSamples,1]).to(device)
+        Y = torch.distributions.uniform.Uniform(yRange[0],yRange[1]).sample([numSamples,1]).to(device)
+        U = torch.distributions.uniform.Uniform(uRange[0],uRange[1]).sample([numSamples,1]).to(device)
+        V = torch.distributions.uniform.Uniform(vRange[0],vRange[1]).sample([numSamples,1]).to(device)
+        T = torch.distributions.uniform.Uniform(tRange[0],tRange[1]).sample([numSamples,1]).to(device)
         X.requires_grad_()
         Y.requires_grad_()
         U.requires_grad_()
@@ -160,84 +161,86 @@ class DiffEq:
         )
 
 def train(network, lossFn, optimiser, scheduler, xRange,yRange,uRange,vRange,tRange,
-            numSamples, mu, lmbda, epochs, iterations, numTimeSteps):
+            numSamples, mu, lmbda):
     """Trains the neural network"""
-    costList=[]
+    global device
+    # costList=[]
     network.train(True)
-    for epoch in range(epochs+1):
-        batch = DataSet(xRange,yRange,uRange,vRange,tRange,numSamples).data_in
-        x, y, u, v, t = torch.split(batch, 1, dim = 1)
-        # x = batch[:,0].view(-1,1)
-        # y = batch[:,1].view(-1,1)
-        # u = batch[:,2].view(-1,1)
-        # v = batch[:,3].view(-1,1)
-        # t = batch[:,4].view(-1,1)
-        # print(x)
-        # print(y)
-        # print(u)
-        # print(v)
-        # print(t)
+    # for batchNum in range(batchNums+1):
+    batch = DataSet(xRange,yRange,uRange,vRange,tRange,numSamples).data_in
+    x, y, u, v, t = torch.split(batch, 1, dim = 1)
+    # x = batch[:,0].view(-1,1)
+    # y = batch[:,1].view(-1,1)
+    # u = batch[:,2].view(-1,1)
+    # v = batch[:,3].view(-1,1)
+    # t = batch[:,4].view(-1,1)
+    # print(x)
+    # print(y)
+    # print(u)
+    # print(v)
+    # print(t)
 
-        out = network.forward(batch)
-        xOut, yOut, uOut, vOut = torch.split(out, 1, dim = 1)
-        # print(xOut)
-        # print(yOut)
-        # print(uOut)
-        # print(vOut)
+    out = network.forward(batch)
+    xOut, yOut, uOut, vOut = torch.split(out, 1, dim = 1)
+    # print(xOut)
+    # print(yOut)
+    # print(uOut)
+    # print(vOut)
 
-         # Get d/dt for every output variable
-        dxOut = grad(xOut,batch,torch.ones_like(xOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
-        dyOut = grad(yOut,batch,torch.ones_like(yOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
-        duOut = grad(uOut,batch,torch.ones_like(uOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
-        dvOut = grad(vOut,batch,torch.ones_like(vOut),retain_graph=True, create_graph=True)[0][:,-1].view(-1,1)
+    # Get d/dt for every output variable
+    _, _, _, _, dxOut = torch.split(grad(xOut,batch,torch.ones_like(xOut),retain_graph=True, create_graph=True)[0], 1, dim = 1)
+    _, _, _, _, dyOut = torch.split(grad(yOut,batch,torch.ones_like(yOut),retain_graph=True, create_graph=True)[0], 1, dim = 1)
+    _, _, _, _, duOut = torch.split(grad(uOut,batch,torch.ones_like(uOut),retain_graph=True, create_graph=True)[0], 1, dim = 1)
+    _, _, _, _, dvOut = torch.split(grad(vOut,batch,torch.ones_like(vOut),retain_graph=True, create_graph=True)[0], 1, dim = 1)
 
-        # xOut = nOut[0,:].view(-1,1)
-        # yOut = nOut[1,:].view(-1,1)
-        # uOut = nOut[2,:].view(-1,1)
-        # vOut = nOut[3,:].view(-1,1)
+    # xOut = nOut[0,:].view(-1,1)
+    # yOut = nOut[1,:].view(-1,1)
+    # uOut = nOut[2,:].view(-1,1)
+    # vOut = nOut[3,:].view(-1,1)
 
-        diffEq = DiffEq(x, y, u, v, mu)
-        # print(diffEq.xTrial(xOut, t))
-        # print(diffEq.yTrial(yOut, t))
-        # print(diffEq.uTrial(uOut, t))
-        # print(diffEq.vTrial(vOut, t))
+    diffEq = DiffEq(x, y, u, v, mu)
+    # print(diffEq.xTrial(xOut, t))
+    # print(diffEq.yTrial(yOut, t))
+    # print(diffEq.uTrial(uOut, t))
+    # print(diffEq.vTrial(vOut, t))
 
 
-        # calculate loss
-        dxEq = diffEq.dxEq(uOut, xOut, dxOut, t)
-        dyEq = diffEq.dyEq(vOut, yOut, dyOut, t)
-        duEq = diffEq.duEq(xOut, yOut, vOut, uOut, duOut, t)
-        dvEq = diffEq.dvEq(xOut, yOut, uOut, vOut, dvOut, t)
-        # D = torch.exp(-lmbda*t) * diffEq.totalDiffEq(xOut,yOut,uOut,vOut,t)
-        dxLoss = lossFn( torch.exp(-lmbda*t) * dxEq, torch.zeros_like(dxEq))
-        dyLoss = lossFn( torch.exp(-lmbda*t) * dyEq, torch.zeros_like(dyEq))
-        duLoss = lossFn( torch.exp(-lmbda*t) * duEq, torch.zeros_like(duEq))
-        dvLoss = lossFn( torch.exp(-lmbda*t) * dvEq, torch.zeros_like(dvEq))
-        loss = (dxLoss + dyLoss + duLoss + dvLoss)
+    # calculate loss
+    dxEq = diffEq.dxEq(uOut, xOut, dxOut, t)
+    dyEq = diffEq.dyEq(vOut, yOut, dyOut, t)
+    duEq = diffEq.duEq(xOut, yOut, vOut, uOut, duOut, t)
+    dvEq = diffEq.dvEq(xOut, yOut, uOut, vOut, dvOut, t)
+    # D = torch.exp(-lmbda*t) * diffEq.totalDiffEq(xOut,yOut,uOut,vOut,t)
+    dxLoss = lossFn( torch.exp(-lmbda*t) * dxEq, torch.zeros_like(dxEq))
+    dyLoss = lossFn( torch.exp(-lmbda*t) * dyEq, torch.zeros_like(dyEq))
+    duLoss = lossFn( torch.exp(-lmbda*t) * duEq, torch.zeros_like(duEq))
+    dvLoss = lossFn( torch.exp(-lmbda*t) * dvEq, torch.zeros_like(dvEq))
+    loss = (dxLoss + dyLoss + duLoss + dvLoss)
 
-        # optimisation
-        loss.backward()
-        optimiser.step()
-        optimiser.zero_grad()
+    # optimisation
+    loss.backward()
+    optimiser.step()
+    optimiser.zero_grad()
 
-        # update scheduler, tracks loss and update learning rate if on plateau   
-        # scheduler.step(loss)
+    # update scheduler, tracks loss and update learning rate if on plateau   
+    scheduler.step(loss)
 
-        if epoch == epochs:
-            plotNetwork(network, mu, epoch, epochs, iterations, 
-                        xRange, yRange, uRange,vRange,tRange, numTimeSteps)
+    # if batchNum == batchNums:
+    #     plotNetwork(network, mu, batchNum, batchNums, iterations, 
+    #                 xRange, yRange, uRange,vRange,tRange, numTimeSteps)
 
-        #store final loss of each epoch
-        costList.append(loss.detach().numpy())
+    #store final loss of each batchNum
+    # costList.append(loss.detach().numpy())
 
     network.train(False)
-    return costList
+    return loss.detach().numpy()
 
-def plotNetwork(network, mu, epoch, epochs, iterations, 
+def plotNetwork(network, mu, batchNum,
                 xRange, yRange,uRange,vRange,tRange, numTimeSteps):
     timeStep = (tRange[1] - tRange[0]) / numTimeSteps
     batch = DataSet(xRange,yRange,uRange,vRange,tRange,10).data_in
     t = torch.linspace(tRange[0],tRange[1],numTimeSteps,requires_grad=True).view(-1,1)
+    t = t.to(device)
 
     for i in range(len(batch)):
         x = torch.tensor([batch[i][0] for _ in range(numTimeSteps)]).view(-1,1)
@@ -248,6 +251,10 @@ def plotNetwork(network, mu, epoch, epochs, iterations,
         y.requires_grad_()
         u.requires_grad_()
         v.requires_grad_()
+        x = x.to(device)
+        y = y.to(device)
+        u = u.to(device)
+        v = v.to(device)
         diffEq = DiffEq(x, y, u, v, mu)
         input = torch.cat((x,y,u,v,t),dim=1)
         # for j in range(5):
@@ -278,7 +285,7 @@ def plotNetwork(network, mu, epoch, epochs, iterations,
     plt.ylabel('y')
     # plt.xlim((-1,1.1))
     # plt.ylim((-1,1))
-    plt.title(str(epoch + iterations*epochs) + " Epochs")
+    plt.title(str(batchNum) + " Batches")
     plt.show()
 
 def rungeKutta(x0, y0, u0, v0, t0, mu, tFinal, timeStep):
@@ -352,43 +359,67 @@ def rungeKutta(x0, y0, u0, v0, t0, mu, tFinal, timeStep):
     return xList, yList
 
 
+if torch.cuda.is_available():
+    print("cuda time")
+    device=torch.device("cuda")
+else:
+    print("sorry no cuda for yuda")
+    device=torch.device("cpu")
+
+
 xRange = [1.05,1.052]
 yRange = [0.099, 0.101]
 uRange = [-0.5,-0.4]
 vRange = [-0.3,-0.2]
 tRange = [-0.01,5]
-numSamples = 100
+numSamples = 10000
 mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
 
-network   = Fitter(numHiddenNodes=128, numHiddenLayers=4)
+network   = Fitter(numHiddenNodes=128, numHiddenLayers=8)
 lossFn    = torch.nn.MSELoss()
-optimiser = torch.optim.Adam(network.parameters(), lr = 1e-2)
+optimiser = torch.optim.Adam(network.parameters(), lr = 1e-3)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimiser, 
-        factor=0.1, 
-        patience=500, 
-        threshold=1e-4, 
+        factor=0.5, 
+        patience=200000, 
+        threshold=0.5,
+        threshold_mode = 'rel',
         cooldown=0, 
-        min_lr=0, 
+        min_lr=1e-6, 
         eps=1e-8, 
         verbose=True
         )
+network = network.to(device)
 
 losses = [1]
-iterations = 0
-epochs = 1000
-while iterations < 10:
+numBatches = 100000
+batchNum = 1
+while batchNum < numBatches:
     newLoss = train(network, lossFn, optimiser, scheduler, xRange,yRange,uRange,vRange,tRange,
-            numSamples, mu, lmbda, epochs, iterations, numTimeSteps)
-    losses.extend(newLoss)
-    iterations += 1
-print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+            numSamples, mu, lmbda)
+    losses.append(newLoss)
+    if batchNum % 10 == 0:
+        plotNetwork(network, mu, batchNum,
+                    xRange, yRange, uRange,vRange,tRange, numTimeSteps)
+        plt.semilogy(losses[1:])
+        plt.xlabel("Batches")
+        plt.ylabel("Loss")
+        plt.title("Loss")
+        plt.show()
+    batchNum += 1
+print(f"{batchNum} batches total, final loss = {losses[-1]}")
 plt.semilogy(losses)
-plt.xlabel("Epochs")
-plt.ylabel("Log of Loss")
+plt.xlabel("batches")
+plt.ylabel("Loss")
 plt.title("Loss")
 plt.show()
 
-#%%
+# %%
+
+# %%
+
+# %%
+
+# %%
