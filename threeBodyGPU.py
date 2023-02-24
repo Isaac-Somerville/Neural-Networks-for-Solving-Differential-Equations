@@ -417,9 +417,3 @@ plt.title("Loss")
 plt.show()
 
 # %%
-
-# %%
-
-# %%
-
-# %%

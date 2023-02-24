@@ -39,10 +39,10 @@ class Fitter(torch.nn.Module):
         # 1 outputs : u
         self.fcLast = torch.nn.Linear(numHiddenNodes, 1)
 
-        self.lambda1 = torch.nn.Parameter(torch.tensor(1.))
-        self.lambda2 = torch.nn.Parameter(torch.tensor(-6.))
-        # self.lambda1 = torch.nn.Parameter(torch.rand(1))
-        # self.lambda2 = torch.nn.Parameter(torch.rand(1))
+        # self.lambda1 = torch.nn.Parameter(torch.tensor(1.))
+        # self.lambda2 = torch.nn.Parameter(torch.tensor(-6.))
+        self.lambda1 = torch.nn.Parameter(torch.rand(1))
+        self.lambda2 = torch.nn.Parameter(torch.rand(1))
 
     def forward(self, input):
         hidden = torch.tanh(self.fc1(input))
@@ -53,61 +53,67 @@ class Fitter(torch.nn.Module):
         return out
 
 
-def train(network, lossFn, optimiser, scheduler, loader, epochs, 
+def trainU(network, lossFn, optimiser, scheduler, loader, epochs, 
             iterations, X, T, XT, u_exact):
-    """Trains the neural network"""
+    """Trains the neural network to approximate u(x,t)"""
     costList=[]
     network.train(True)
     for epoch in range(epochs+1):
         for batch in loader:
+            # print(batch)
+            u_out = network.forward(batch)
+            # print(u_out)
+            # du = grad(u_out, batch, torch.ones_like(u_out), retain_graph=True, create_graph=True)[0]
+            # # print(du)
+            # d2u = grad(du, batch, torch.ones_like(du), retain_graph=True, create_graph=True)[0]
+            # # print(d2u)
+            # u_x, u_t, _ = torch.split(du, 1, dim =1)
+            # # print(u_t)
+            # # print(u_x)
+            # u_xx, u_tt, _ = torch.split(d2u, 1, dim =1)
+            # print(u_xx)
+ 
+            # print(network.lambda1)
+            # print(network.lambda2)
 
-            ######### WITH LBFGS ALGORITHM
-            # def closure():
-            #     print(epoch)
-            #     optimiser.zero_grad()
-            #     u_out = network.forward(batch)
+            _, _, batch_u_exact = torch.split(batch,1, dim =1)
+            # print(u_exact)
 
-            #     du = grad(u_out, batch, torch.ones_like(u_out), retain_graph=True, create_graph=True)[0]
-            #     # print(du)
-            #     d2u = grad(du, batch, torch.ones_like(du), retain_graph=True, create_graph=True)[0]
-            #     # print(d2u)
-            #     u_x, u_t, _ = torch.split(du, 1, dim =1)
-            #     # print(u_t)
-            #     # print(u_x)
-            #     u_xx, u_tt, _ = torch.split(d2u, 1, dim =1)
-            #     # print(u_xx)
+            # diffEqLHS = diffEq(u_out, u_t, u_x, u_xx, network.lambda1, network.lambda2)
+            # diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
 
-            #     # print(network.lambda1)
-            #     # print(network.lambda2)
+            loss = lossFn(u_out, batch_u_exact)
+            # DELoss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
 
-            #     # diffEqLHS = diffEq(u_out, u_t, u_x, u_xx, network.lambda1, network.lambda2)
-            #     diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
+            # loss = uLoss + DELoss
 
-            #     # batch_u_exact = batch[:,2].view(-1,1)
-            #     _, _, batch_u_exact = torch.split(batch,1, dim =1)
-            #     # print(u_exact)
+            loss.backward()
+            optimiser.step()
+            optimiser.zero_grad()
 
-            #     uLoss = lossFn(u_out, batch_u_exact)
-            #     DELoss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
+        # update scheduler, tracks loss and updates learning rate if on plateau   
+        scheduler.step(loss)
 
-            #     loss = uLoss + DELoss
+        # store final loss of each epoch
+        costList.append(loss.detach().numpy())
 
-            #     loss.backward()
+        if epoch == epochs:
+            # test(network, XT, u_exact, lossFn)
+            plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations)
+            # print("u_train loss = ", uLoss.item())
+            # print("DE_train loss = ", DELoss.item())
+            print("current train loss = ", loss.detach().numpy())
 
-            #     costList.append(loss.item())
-            #     if epoch == epochs:
-            #         # test(network, XT, u_exact, lossFn)
-            #         plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations)
-            #         print("u_train loss = ", uLoss.item())
-            #         print("DE_train loss = ", DELoss.item())
-            #         print("current train loss = ", loss.detach().numpy())
-            #     return loss
+    network.train(False)
+    return costList
 
-            # optimiser.step(closure)
-
-            ######### 
-
-            ######### WITH ADAM
+def trainDE(network, lossFn, optimiser, scheduler, loader, epochs, 
+            iterations, X, T, XT, u_exact):
+    """Trains the neural network to approximate lambda1, lambda2"""
+    costList=[]
+    network.train(True)
+    for epoch in range(epochs+1):
+        for batch in loader:
             # print(batch)
             u_out = network.forward(batch)
             # print(u_out)
@@ -128,12 +134,18 @@ def train(network, lossFn, optimiser, scheduler, loader, epochs,
             # print(u_exact)
 
             # diffEqLHS = diffEq(u_out, u_t, u_x, u_xx, network.lambda1, network.lambda2)
-            diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
+            
+            # With exponential for lambda2
+            # diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
 
-            uLoss = lossFn(u_out, batch_u_exact)
-            DELoss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
+            # Without exponential for lambda2
+            diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (network.lambda2 * u_xx)
 
-            loss = uLoss + DELoss
+            # loss = lossFn(u_out, batch_u_exact)
+            loss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
+
+            # loss = uLoss + DELoss
+
             loss.backward()
             print("lambda1 grad = ", network.lambda1.grad)
             print("lambda2 grad = ", network.lambda2.grad)
@@ -147,13 +159,20 @@ def train(network, lossFn, optimiser, scheduler, loader, epochs,
         costList.append(loss.detach().numpy())
 
         if epoch == epochs:
-            # test(network, XT, u_exact, lossFn)
-            plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations)
-            print("u_train loss = ", uLoss.item())
-            print("DE_train loss = ", DELoss.item())
-            print("current train loss = ", loss.detach().numpy())
+            print("lambda1 = ", network.lambda1)
 
-        ###########
+            # With exponential for lambda2
+            # print("lambda2 = ", torch.exp(network.lambda2))
+
+            # Without exponential for lambda2
+            print("lambda2 = ", network.lambda2)
+            print("lambda1 grad = ", network.lambda1.grad)
+            print("lambda2 grad = ", network.lambda2.grad)
+        #     # test(network, XT, u_exact, lossFn)
+        #     plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations)
+        #     # print("u_train loss = ", uLoss.item())
+        #     # print("DE_train loss = ", DELoss.item())
+        #     print("current train loss = ", loss.detach().numpy())
 
     network.train(False)
     return costList
@@ -202,7 +221,14 @@ def plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations):
     lambda1 = network.lambda1
     lambda2 = network.lambda2
     print("lambda1 = ", lambda1.item())
-    print("lambda2 = ", torch.exp(lambda2).item())
+
+    # With exponential for lambda2
+    # print("lambda2 = ", torch.exp(lambda2).item())
+
+    # Without exponential for lambda2
+    print("lambda2 = ", lambda2.item())
+    print("lambda1 grad = ", lambda1.grad)
+    print("lambda2 grad = ", lambda2.grad)
 
     # print(X.shape)
     # print(T.shape)
@@ -239,14 +265,13 @@ u_exact = Exact.flatten()[:,None]
 # print(u_exact.shape)
 
 numSamples = 1000
-# network    = Fitter(numHiddenNodes=32, numHiddenLayers=16)
-network = torch.load('burger.pt')
+network    = Fitter(numHiddenNodes=16, numHiddenLayers=8)
 trainData = DataSet(XT, u_exact, numSamples)
 trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples), shuffle=True)
 lossFn   = torch.nn.MSELoss()
 for n in network.parameters():
     print(n)
-optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
+optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-3)
 # optimiser = torch.optim.LBFGS(network.parameters(), lr = 1e-3)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimiser, 
@@ -259,20 +284,45 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     verbose=True
     )
 
-losses = [1]
+network.lambda1.requires_grad = False
+network.lambda2.requires_grad = False
+
+uLosses = [1]
 iterations = 0
 epochs = 1000
 while iterations < 5:
-    newLoss = train(network, lossFn, optimiser, scheduler, trainLoader, 
+    newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, 
                     epochs, iterations, X, T, XT, u_exact)
-    losses.extend(newLoss)
+    uLosses.extend(newLoss)
     iterations += 1
-    plt.semilogy(losses[1:])
+    plt.semilogy(uLosses[1:])
     plt.xlabel("Epochs")
-    plt.ylabel("Log of Loss")
-    plt.title("Loss")
+    plt.ylabel("Loss")
+    plt.title("u Loss")
     plt.show()
-losses = losses[1:]
+
+for n in network.parameters():
+    n.requires_grad = False
+    print(n)
+
+for g in optimiser.param_groups:
+        g['lr'] = 1e-2
+network.lambda1.requires_grad = True
+network.lambda2.requires_grad = True
+
+DELosses = [1]
+iterations = 0
+while iterations < 5:
+    newLoss = trainDE(network, lossFn, optimiser, scheduler, trainLoader, 
+                    epochs, iterations, X, T, XT, u_exact)
+    DELosses.extend(newLoss)
+    iterations += 1
+    plt.semilogy(DELosses[1:])
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title("DE Loss")
+    plt.show()
+
 # print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
 # plt.semilogy(losses)
 # plt.xlabel("Epochs")
@@ -286,7 +336,5 @@ plotNetwork(network, X, T, XT, u_exact, 0, epochs, iterations)
 
 for n in network.parameters():
     print(n)
-
-# torch.save(network, 'burger.pt')
 
 # %%
