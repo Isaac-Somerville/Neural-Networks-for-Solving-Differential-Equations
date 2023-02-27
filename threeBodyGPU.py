@@ -164,9 +164,7 @@ def train(network, lossFn, optimiser, scheduler, xRange,yRange,uRange,vRange,tRa
             numSamples, mu, lmbda):
     """Trains the neural network"""
     global device
-    # costList=[]
     network.train(True)
-    # for batchNum in range(batchNums+1):
     batch = DataSet(xRange,yRange,uRange,vRange,tRange,numSamples).data_in
     x, y, u, v, t = torch.split(batch, 1, dim = 1)
     # x = batch[:,0].view(-1,1)
@@ -210,7 +208,7 @@ def train(network, lossFn, optimiser, scheduler, xRange,yRange,uRange,vRange,tRa
     dyEq = diffEq.dyEq(vOut, yOut, dyOut, t)
     duEq = diffEq.duEq(xOut, yOut, vOut, uOut, duOut, t)
     dvEq = diffEq.dvEq(xOut, yOut, uOut, vOut, dvOut, t)
-    # D = torch.exp(-lmbda*t) * diffEq.totalDiffEq(xOut,yOut,uOut,vOut,t)
+
     dxLoss = lossFn( torch.exp(-lmbda*t) * dxEq, torch.zeros_like(dxEq))
     dyLoss = lossFn( torch.exp(-lmbda*t) * dyEq, torch.zeros_like(dyEq))
     duLoss = lossFn( torch.exp(-lmbda*t) * duEq, torch.zeros_like(duEq))
@@ -224,13 +222,6 @@ def train(network, lossFn, optimiser, scheduler, xRange,yRange,uRange,vRange,tRa
 
     # update scheduler, tracks loss and update learning rate if on plateau   
     scheduler.step(loss)
-
-    # if batchNum == batchNums:
-    #     plotNetwork(network, mu, batchNum, batchNums, iterations, 
-    #                 xRange, yRange, uRange,vRange,tRange, numTimeSteps)
-
-    #store final loss of each batchNum
-    # costList.append(loss.detach().numpy())
 
     network.train(False)
     return loss.detach().numpy()
@@ -376,44 +367,63 @@ numSamples = 10000
 mu = 0.01
 lmbda = 2
 numTimeSteps = 1000
-
-network   = Fitter(numHiddenNodes=128, numHiddenLayers=8)
-lossFn    = torch.nn.MSELoss()
-optimiser = torch.optim.Adam(network.parameters(), lr = 1e-3)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimiser, 
-        factor=0.5, 
-        patience=200000, 
-        threshold=0.5,
-        threshold_mode = 'rel',
-        cooldown=0, 
-        min_lr=1e-6, 
-        eps=1e-8, 
-        verbose=True
-        )
-network = network.to(device)
-
-losses = [1]
 numBatches = 100000
-batchNum = 1
+
+try:
+    checkpoint = torch.load('threeBody.pth')
+    batchNum = checkpoint['batchNum']
+    network = checkpoint['network']
+    optimiser = checkpoint['optimiser']
+    scheduler = checkpoint['scheduler']
+    losses = checkpoint['losses']
+    print("model loaded")
+except:
+    batchNum = 0
+    network   = Fitter(numHiddenNodes=128, numHiddenLayers=8)
+    network = network.to(device)
+    optimiser = torch.optim.Adam(network.parameters(), lr = 1e-3)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimiser, 
+            factor=0.5, 
+            patience=200000, 
+            threshold=0.5,
+            threshold_mode = 'rel',
+            cooldown=0, 
+            min_lr=1e-6, 
+            eps=1e-8, 
+            verbose=True
+            )
+    losses = []
+    print("new model created")
+
+lossFn    = torch.nn.MSELoss()
+
 while batchNum < numBatches:
     newLoss = train(network, lossFn, optimiser, scheduler, xRange,yRange,uRange,vRange,tRange,
             numSamples, mu, lmbda)
     losses.append(newLoss)
-    if batchNum % 10 == 0:
-        plotNetwork(network, mu, batchNum,
-                    xRange, yRange, uRange,vRange,tRange, numTimeSteps)
-        plt.semilogy(losses[1:])
-        plt.xlabel("Batches")
-        plt.ylabel("Loss")
-        plt.title("Loss")
-        plt.show()
+    if batchNum != 0:
+        if batchNum % 10 == 0:
+            plotNetwork(network, mu, batchNum,
+                        xRange, yRange, uRange,vRange,tRange, numTimeSteps)
+            plt.semilogy(losses)
+            plt.xlabel("Batches")
+            plt.ylabel("Loss")
+            plt.title("Loss")
+            plt.show()
+        if batchNum % 50 == 0:
+            checkpoint = { 
+            'batchNum': batchNum,
+            'network': network,
+            'optimiser': optimiser,
+            'scheduler': scheduler,
+            'losses': losses
+            }
+            torch.save(checkpoint, 'threeBody.pth')
     batchNum += 1
+
 print(f"{batchNum} batches total, final loss = {losses[-1]}")
-plt.semilogy(losses)
-plt.xlabel("batches")
-plt.ylabel("Loss")
-plt.title("Loss")
-plt.show()
+
+# %%
 
 # %%

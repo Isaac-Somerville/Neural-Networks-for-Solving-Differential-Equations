@@ -53,12 +53,11 @@ class Fitter(torch.nn.Module):
         return out
 
 
-def train(network, lossFn, optimiser, scheduler, loader, epochs, 
-            iterations, X, T, XT, u_exact):
+def train(network, lossFn, optimiser, scheduler, loader, numEpochs):
     """Trains the neural network"""
     costList=[]
     network.train(True)
-    for epoch in range(epochs+1):
+    for _ in range(numEpochs):
         for batch in loader:
 
             ######### WITH LBFGS ALGORITHM
@@ -135,8 +134,8 @@ def train(network, lossFn, optimiser, scheduler, loader, epochs,
 
             loss = uLoss + DELoss
             loss.backward()
-            print("lambda1 grad = ", network.lambda1.grad)
-            print("lambda2 grad = ", network.lambda2.grad)
+            # print("lambda1 grad = ", network.lambda1.grad)
+            # print("lambda2 grad = ", network.lambda2.grad)
             optimiser.step()
             optimiser.zero_grad()
 
@@ -146,14 +145,11 @@ def train(network, lossFn, optimiser, scheduler, loader, epochs,
         # store final loss of each epoch
         costList.append(loss.detach().numpy())
 
-        if epoch == epochs:
-            # test(network, XT, u_exact, lossFn)
-            plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations)
-            print("u_train loss = ", uLoss.item())
-            print("DE_train loss = ", DELoss.item())
-            print("current train loss = ", loss.detach().numpy())
-
-        ###########
+    # test(network, XT, u_exact, lossFn)
+    print("u_train loss = ", uLoss.item())
+    print("DE_train loss = ", DELoss.item())
+    print("current train loss = ", loss.detach().numpy())
+    ###########
 
     network.train(False)
     return costList
@@ -187,7 +183,7 @@ def test(network, XT, u_exact, lossFn):
     return
 
 
-def plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations):
+def plotNetwork(network, X, T, XT, u_exact, epoch):
     XT = torch.tensor(XT).float()
     u_exact = torch.tensor(u_exact).float()
 
@@ -216,7 +212,7 @@ def plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations):
     ax.set_xlabel('x')
     ax.set_ylabel('t')
     # ax.legend()
-    ax.set_title(str(epoch + iterations*epochs) + " Epochs")
+    ax.set_title(str(epoch) + " Epochs")
     #ax.view_init(30, 315)
     plt.show()
     return
@@ -239,54 +235,73 @@ u_exact = Exact.flatten()[:,None]
 # print(u_exact.shape)
 
 numSamples = 1000
-# network    = Fitter(numHiddenNodes=32, numHiddenLayers=16)
-network = torch.load('burger.pt')
+
+try:
+    checkpoint = torch.load('burger.pth')
+    epoch = checkpoint['epoch']
+    network = checkpoint['network']
+    optimiser = checkpoint['optimiser']
+    scheduler = checkpoint['scheduler']
+    losses = checkpoint['losses']
+except:
+    epoch = 0
+    network    = Fitter(numHiddenNodes=32, numHiddenLayers=16)
+    optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-4)
+    # optimiser = torch.optim.LBFGS(network.parameters(), lr = 1e-3)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimiser, 
+        factor=0.1, 
+        patience=500, 
+        threshold=1e-4, 
+        cooldown=0, 
+        min_lr=0, 
+        eps=1e-8, 
+        verbose=True
+    )
+    losses = []
+
 trainData = DataSet(XT, u_exact, numSamples)
 trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples), shuffle=True)
 lossFn   = torch.nn.MSELoss()
 for n in network.parameters():
     print(n)
-optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-2)
-# optimiser = torch.optim.LBFGS(network.parameters(), lr = 1e-3)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimiser, 
-    factor=0.1, 
-    patience=500, 
-    threshold=1e-4, 
-    cooldown=0, 
-    min_lr=0, 
-    eps=1e-8, 
-    verbose=True
-    )
 
-losses = [1]
 iterations = 0
-epochs = 1000
+numEpochs = 1000
 while iterations < 5:
-    newLoss = train(network, lossFn, optimiser, scheduler, trainLoader, 
-                    epochs, iterations, X, T, XT, u_exact)
+    newLoss = train(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     losses.extend(newLoss)
     iterations += 1
-    plt.semilogy(losses[1:])
+    epoch += numEpochs
+
+    plotNetwork(network, X, T, XT, u_exact, epoch)
+
+    plt.semilogy(losses)
     plt.xlabel("Epochs")
-    plt.ylabel("Log of Loss")
+    plt.ylabel("Loss")
     plt.title("Loss")
     plt.show()
-losses = losses[1:]
 # print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
 # plt.semilogy(losses)
 # plt.xlabel("Epochs")
-# plt.ylabel("Log of Loss")
+# plt.ylabel(" Loss")
 # plt.title("Loss")
 # plt.show()
 
 print("True value of lambda1 = ", 1.0)
 print("True value of lambda2 = ", 0.01 / np.pi)
-plotNetwork(network, X, T, XT, u_exact, 0, epochs, iterations)
+plotNetwork(network, X, T, XT, u_exact, epoch)
 
 for n in network.parameters():
     print(n)
 
-# torch.save(network, 'burger.pt')
+checkpoint = { 
+    'epoch': epoch,
+    'network': network,
+    'optimiser': optimiser,
+    'scheduler': scheduler,
+    'losses': losses
+    }
+torch.save(checkpoint, 'burger.pth')
 
 # %%
