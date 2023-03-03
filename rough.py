@@ -138,6 +138,8 @@ import matplotlib.pyplot as plt
 # print(m)
 # out.backward(m)
 # print(a.grad)
+
+######### Loss surface examples
 xrange = [-0.2,1.9]
 yrange = [0.7,2.9]
 
@@ -166,10 +168,45 @@ ax.set_xlabel('w', fontsize = 16)
 ax.set_title('Error Surface J(w,b)', fontsize = 16)
 plt.show()
 
+#########
 
-# %%
+xrange = [-6,6]
+xLin = np.linspace(xrange[0], xrange[1], 100)
+plt.axhline(y=0, color='0.8')
+plt.axvline(x=0, color='0.8')
+plt.xlabel('x', fontsize = 16)
 
-# %%
+def sigmoid(x):
+    return  1 / (1+np.exp(-x))
+
+# sig = [sigmoid(x) for x in xLin]
+# plt.plot(xLin, sig)
+# plt.ylabel('\u03C3(x)', fontsize = 16)
+# plt.title('Sigmoid \u03C3(x)', fontsize = 16)
+
+# plt.ylabel('tanh(x)', fontsize = 16)
+# plt.title('tanh(x)', fontsize = 16)
+# tanh = [np.tanh(x) for x in xLin]
+# plt.plot(xLin,tanh)
+
+# def reLU(x):
+#     return max(0,x)
+
+# plt.ylabel('ReLU(x)', fontsize = 16)
+# plt.title('Rectified Linear Unit', fontsize = 16)
+# relu = [reLU(x) for x in xLin]
+# plt.plot(xLin,relu)
+
+def LeakyReLU(x):
+    return max(0.01*x,x)
+
+plt.ylabel('Leaky ReLU(x)', fontsize = 16)
+plt.title('Leaky ReLU', fontsize = 16)
+relu = [LeakyReLU(x) for x in xLin]
+plt.plot(xLin,relu)
+
+
+
 
 # %%
 

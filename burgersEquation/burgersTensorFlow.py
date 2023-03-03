@@ -147,7 +147,7 @@ if __name__ == "__main__":
     N_u = 2000
     layers = [2, 20, 20, 20, 20, 20, 20, 20, 20, 1]
     
-    data = scipy.io.loadmat('../Data/burgers_shock.mat')
+    data = scipy.io.loadmat('burgersData.mat')
     
     t = data['t'].flatten()[:,None]
     x = data['x'].flatten()[:,None]

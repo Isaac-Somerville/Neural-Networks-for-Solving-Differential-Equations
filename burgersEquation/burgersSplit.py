@@ -1,4 +1,10 @@
 #%%
+
+#############
+# Adam optimiser, trains for u(x,t) first, then lambda_i
+#############
+
+
 import torch
 import torch.utils.data
 import torch.distributions
@@ -39,10 +45,14 @@ class Fitter(torch.nn.Module):
         # 1 outputs : u
         self.fcLast = torch.nn.Linear(numHiddenNodes, 1)
 
-        # self.lambda1 = torch.nn.Parameter(torch.tensor(1.))
-        # self.lambda2 = torch.nn.Parameter(torch.tensor(-6.))
-        self.lambda1 = torch.nn.Parameter(torch.rand(1))
-        self.lambda2 = torch.nn.Parameter(torch.rand(1))
+        # Initialise lambda1, lambda2 as in paper
+        self.lambda1 = torch.nn.Parameter(torch.tensor(0.))
+        self.lambda2 = torch.nn.Parameter(torch.tensor(-6.))
+
+        # Initalise lambda1, lambda2 randomly
+        # N.B. should replace exp(lambda2) with lambda2 if doing this
+        # self.lambda1 = torch.nn.Parameter(torch.rand(1))
+        # self.lambda2 = torch.nn.Parameter(torch.rand(1))
 
     def forward(self, input):
         hidden = torch.tanh(self.fc1(input))
@@ -53,39 +63,20 @@ class Fitter(torch.nn.Module):
         return out
 
 
-def trainU(network, lossFn, optimiser, scheduler, loader, epochs, 
-            iterations, X, T, XT, u_exact):
+def trainU(network, lossFn, optimiser, scheduler, loader, numEpochs):
     """Trains the neural network to approximate u(x,t)"""
     costList=[]
     network.train(True)
-    for epoch in range(epochs+1):
+    for _ in range(numEpochs):
         for batch in loader:
             # print(batch)
             u_out = network.forward(batch)
             # print(u_out)
-            # du = grad(u_out, batch, torch.ones_like(u_out), retain_graph=True, create_graph=True)[0]
-            # # print(du)
-            # d2u = grad(du, batch, torch.ones_like(du), retain_graph=True, create_graph=True)[0]
-            # # print(d2u)
-            # u_x, u_t, _ = torch.split(du, 1, dim =1)
-            # # print(u_t)
-            # # print(u_x)
-            # u_xx, u_tt, _ = torch.split(d2u, 1, dim =1)
-            # print(u_xx)
- 
-            # print(network.lambda1)
-            # print(network.lambda2)
 
             _, _, batch_u_exact = torch.split(batch,1, dim =1)
             # print(u_exact)
 
-            # diffEqLHS = diffEq(u_out, u_t, u_x, u_xx, network.lambda1, network.lambda2)
-            # diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
-
             loss = lossFn(u_out, batch_u_exact)
-            # DELoss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
-
-            # loss = uLoss + DELoss
 
             loss.backward()
             optimiser.step()
@@ -97,22 +88,15 @@ def trainU(network, lossFn, optimiser, scheduler, loader, epochs,
         # store final loss of each epoch
         costList.append(loss.detach().numpy())
 
-        if epoch == epochs:
-            # test(network, XT, u_exact, lossFn)
-            plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations)
-            # print("u_train loss = ", uLoss.item())
-            # print("DE_train loss = ", DELoss.item())
-            print("current train loss = ", loss.detach().numpy())
-
+    print("current u train loss = ", loss.detach().numpy())     
     network.train(False)
     return costList
 
-def trainDE(network, lossFn, optimiser, scheduler, loader, epochs, 
-            iterations, X, T, XT, u_exact):
+def trainDE(network, lossFn, optimiser, scheduler, loader, numEpochs):
     """Trains the neural network to approximate lambda1, lambda2"""
     costList=[]
     network.train(True)
-    for epoch in range(epochs+1):
+    for _ in range(numEpochs):
         for batch in loader:
             # print(batch)
             u_out = network.forward(batch)
@@ -126,29 +110,20 @@ def trainDE(network, lossFn, optimiser, scheduler, loader, epochs,
             # print(u_x)
             u_xx, u_tt, _ = torch.split(d2u, 1, dim =1)
             # print(u_xx)
- 
-            # print(network.lambda1)
-            # print(network.lambda2)
-
-            _, _, batch_u_exact = torch.split(batch,1, dim =1)
-            # print(u_exact)
-
-            # diffEqLHS = diffEq(u_out, u_t, u_x, u_xx, network.lambda1, network.lambda2)
             
             # With exponential for lambda2
-            # diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
+            diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
 
             # Without exponential for lambda2
-            diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (network.lambda2 * u_xx)
+            # diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (network.lambda2 * u_xx)
 
-            # loss = lossFn(u_out, batch_u_exact)
             loss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
 
-            # loss = uLoss + DELoss
-
             loss.backward()
-            print("lambda1 grad = ", network.lambda1.grad)
-            print("lambda2 grad = ", network.lambda2.grad)
+
+            # Examine grads on lambda1, lambda2
+            print("lambda1 grad = ", network.lambda1.grad.item())
+            print("lambda2 grad = ", network.lambda2.grad.item())
             optimiser.step()
             optimiser.zero_grad()
 
@@ -158,26 +133,26 @@ def trainDE(network, lossFn, optimiser, scheduler, loader, epochs,
         # store final loss of each epoch
         costList.append(loss.detach().numpy())
 
-        if epoch == epochs:
-            print("lambda1 = ", network.lambda1)
+        
 
-            # With exponential for lambda2
-            # print("lambda2 = ", torch.exp(network.lambda2))
+    print("current DE train loss = ", loss.detach().numpy())
+    
+    print("lambda1 = ", network.lambda1.item())
+    # With exponential for lambda2
+    print("lambda2 = ", torch.exp(network.lambda2))
 
-            # Without exponential for lambda2
-            print("lambda2 = ", network.lambda2)
-            print("lambda1 grad = ", network.lambda1.grad)
-            print("lambda2 grad = ", network.lambda2.grad)
-        #     # test(network, XT, u_exact, lossFn)
-        #     plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations)
-        #     # print("u_train loss = ", uLoss.item())
-        #     # print("DE_train loss = ", DELoss.item())
-        #     print("current train loss = ", loss.detach().numpy())
+    # Without exponential for lambda2
+    # print("lambda2 = ", network.lambda2.item())
+    print("lambda1 grad = ", network.lambda1.grad.item())
+    print("lambda2 grad = ", network.lambda2.grad.item())
 
     network.train(False)
     return costList
 
 def test(network, XT, u_exact, lossFn):
+    """
+    Tests network solution on all 25600 sample points
+    """
     testData = DataSet(XT , u_exact, XT.shape[0])
     batch = testData.data_in
     u_out = network.forward(batch)
@@ -191,9 +166,6 @@ def test(network, XT, u_exact, lossFn):
     u_xx, u_tt, _ = torch.split(d2u, 1, dim =1)
     # print(u_xx)
 
-    # print(network.lambda1)
-    # print(network.lambda2)
-
     diffEqLHS = u_t + (network.lambda1 * u_out * u_x) - (torch.exp(network.lambda2) * u_xx)
     uTestLoss = lossFn(u_out, batch[:,2].view(-1,1))
     DETestLoss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
@@ -206,7 +178,10 @@ def test(network, XT, u_exact, lossFn):
     return
 
 
-def plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations):
+def plotNetwork(network, X, T, XT, u_exact, epoch):
+    """
+    Plots network solution for all 25600 sample points
+    """
     XT = torch.tensor(XT).float()
     u_exact = torch.tensor(u_exact).float()
 
@@ -218,36 +193,29 @@ def plotNetwork(network, X, T, XT, u_exact, epoch, epochs, iterations):
     u_out = u_out.reshape(X.shape[0],X.shape[1])
     # print(u_out)
     u_out = u_out.detach().numpy()
-    lambda1 = network.lambda1
-    lambda2 = network.lambda2
-    print("lambda1 = ", lambda1.item())
-
-    # With exponential for lambda2
-    # print("lambda2 = ", torch.exp(lambda2).item())
-
-    # Without exponential for lambda2
-    print("lambda2 = ", lambda2.item())
-    print("lambda1 grad = ", lambda1.grad)
-    print("lambda2 grad = ", lambda2.grad)
 
     # print(X.shape)
     # print(T.shape)
     # print(u_out.shape)
 
-    # Plot both trial and exact solutions
+    # Plot trial solution
     ax = plt.axes(projection='3d')
     ax.plot_surface(X,T,u_out,rstride=1, cstride=1,
                 cmap='plasma', edgecolor='none')
-    # ax.scatter(X,T,u_exact, label = 'Exact Solution')
     ax.set_xlabel('x')
     ax.set_ylabel('t')
+    
+    # Plot exact solution
+    # ax.scatter(X,T,u_exact, label = 'Exact Solution')
     # ax.legend()
-    ax.set_title(str(epoch + iterations*epochs) + " Epochs")
-    #ax.view_init(30, 315)
+
+    ax.set_title(str(epoch) + " Epochs")
     plt.show()
     return
 
 
+# load and format sample data (dictionary) for u(x,t)
+# there are 25600 samples in total 
 data = scipy.io.loadmat('burgersData.mat')
 
 t = data['t'].flatten()[:,None]
@@ -264,18 +232,21 @@ u_exact = Exact.flatten()[:,None]
 # print(u_exact.reshape(X.shape[0],X.shape[1]))
 # print(u_exact.shape)
 
-numSamples = 1000
+# number of training samples
+numSamples = 2000
+epoch = 0 
 network    = Fitter(numHiddenNodes=16, numHiddenLayers=8)
 trainData = DataSet(XT, u_exact, numSamples)
-trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples), shuffle=True)
+trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=numSamples, shuffle=True)
 lossFn   = torch.nn.MSELoss()
-for n in network.parameters():
-    print(n)
+
+# for n in network.parameters():
+#     print(n)
+
 optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-3)
-# optimiser = torch.optim.LBFGS(network.parameters(), lr = 1e-3)
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimiser, 
-    factor=0.1, 
+    factor=0.5, 
     patience=500, 
     threshold=1e-4, 
     cooldown=0, 
@@ -284,57 +255,58 @@ scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     verbose=True
     )
 
+# Don't update lambda_i while training u
 network.lambda1.requires_grad = False
 network.lambda2.requires_grad = False
 
-uLosses = [1]
+uLosses = []
 iterations = 0
-epochs = 1000
+numEpochs = 1000 # number of epochs to train each iteration
 while iterations < 5:
-    newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, 
-                    epochs, iterations, X, T, XT, u_exact)
+    newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     uLosses.extend(newLoss)
     iterations += 1
-    plt.semilogy(uLosses[1:])
+    epoch += numEpochs
+    plt.semilogy(uLosses)
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
     plt.title("u Loss")
     plt.show()
+    plotNetwork(network, X, T, XT, u_exact, epoch)
 
+test(network, XT, u_exact, lossFn)
+
+# stop updating weights and biases
 for n in network.parameters():
     n.requires_grad = False
-    print(n)
 
+# reset learning rate (in case scheduler altered it)
 for g in optimiser.param_groups:
         g['lr'] = 1e-2
+
+# update lambda1, lambda2
 network.lambda1.requires_grad = True
 network.lambda2.requires_grad = True
 
-DELosses = [1]
+DELosses = []
 iterations = 0
 while iterations < 5:
-    newLoss = trainDE(network, lossFn, optimiser, scheduler, trainLoader, 
-                    epochs, iterations, X, T, XT, u_exact)
+    newLoss = trainDE(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     DELosses.extend(newLoss)
     iterations += 1
-    plt.semilogy(DELosses[1:])
+    plt.semilogy(DELosses)
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
     plt.title("DE Loss")
     plt.show()
 
-# print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
-# plt.semilogy(losses)
-# plt.xlabel("Epochs")
-# plt.ylabel("Log of Loss")
-# plt.title("Loss")
-# plt.show()
-
+print("Final value of lambda1 = ", network.lambda1.item())
+print("Final value of lambda2 = ", torch.exp(network.lambda2).item())
 print("True value of lambda1 = ", 1.0)
 print("True value of lambda2 = ", 0.01 / np.pi)
-plotNetwork(network, X, T, XT, u_exact, 0, epochs, iterations)
+test(network, XT, u_exact, lossFn)
 
-for n in network.parameters():
-    print(n)
+# for n in network.parameters():
+#     print(n)
 
 # %%

@@ -40,6 +40,7 @@ class Fitter(torch.nn.Module):
         self.fcLast = torch.nn.Linear(numHiddenNodes, 4)
 
     def forward(self, input):
+        # TRY WITH SWISH??
         hidden = torch.tanh(self.fc1(input))
         for i in range(len(self.fcs)):
             # print(self.fcs[i])
