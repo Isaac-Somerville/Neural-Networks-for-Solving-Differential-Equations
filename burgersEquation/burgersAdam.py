@@ -245,7 +245,7 @@ lossFn   = torch.nn.MSELoss()
 
 iterations = 0
 numEpochs = 1000 # number of epochs to train each iteration
-while iterations < 5:
+while iterations < 100:
     newLoss = train(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     losses.extend(newLoss)
     iterations += 1

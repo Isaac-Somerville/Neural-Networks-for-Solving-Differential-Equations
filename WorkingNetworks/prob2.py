@@ -62,12 +62,12 @@ def train(network, loader, loss_fn, optimiser, epochs, iterations):
             f = torch.tensor(np.exp(-x/5)*np.cos(x)) - (1/5)*phit
             diffeq = dphidx - f
             loss = loss_fn(diffeq, torch.zeros_like(diffeq))
-            cost_list.append(loss.detach().numpy())
             loss.backward()
             optimiser.step()
             optimiser.zero_grad()
         if epoch%(epochs/5)==0:
             plotit(network, epoch, epochs, iterations)
+        cost_list.append(loss.detach().numpy())
     network.train(False)
     return cost_list
 
@@ -110,12 +110,12 @@ xrange=[0, 10]
 num_samples = 30
 network      = Fitter(num_hidden_nodes=10)
 train_set    = DataSet(num_samples,  xrange)
-train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=60, shuffle=True)
+train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=1, shuffle=True)
 loss_fn      = torch.nn.MSELoss()
 # This does not work *at all* if you use SGD as the optimiser. It just does
 # not manage to get the oscillations right. For Adam it is miraculously good.
-optimiser    = torch.optim.Adam(network.parameters(), lr=1e-3)
-# optimiser    = torch.optim.SGD(network.parameters(), lr=1e-3)
+# optimiser    = torch.optim.Adam(network.parameters(), lr=1e-3)
+optimiser    = torch.optim.SGD(network.parameters(), lr=1e-2)
 
 
 #train(network, train_loader, loss_fn, optimiser, 2000)
@@ -123,14 +123,14 @@ optimiser    = torch.optim.Adam(network.parameters(), lr=1e-3)
 losses = [1]
 iterations = 0
 epochs = 5000
-while losses[-1] > 0.001 and iterations < 10:
+while iterations < 5:
     losses.extend( train(network, train_loader, loss_fn, optimiser, epochs, iterations) )
     iterations += 1
 losses = losses[1:]
 print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
 
 plt.semilogy(losses)
-plt.xlabel("Epochs")
-plt.ylabel("Log of Loss")
-plt.title("Loss")
+plt.xlabel("Epochs",fontsize = 16)
+plt.ylabel("Cost",fontsize = 16)
+plt.title("Cost",fontsize = 16)
 # %%

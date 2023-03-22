@@ -175,41 +175,63 @@ xLin = np.linspace(xrange[0], xrange[1], 100)
 plt.axhline(y=0, color='0.8')
 plt.axvline(x=0, color='0.8')
 plt.xlabel('x', fontsize = 16)
+plt.ylabel('y', fontsize = 16)
+
 
 def sigmoid(x):
     return  1 / (1+np.exp(-x))
 
-# sig = [sigmoid(x) for x in xLin]
-# plt.plot(xLin, sig)
-# plt.ylabel('\u03C3(x)', fontsize = 16)
-# plt.title('Sigmoid \u03C3(x)', fontsize = 16)
+def dsigmoid(x):
+    return sigmoid(x) * (1-sigmoid(x))
 
-# plt.ylabel('tanh(x)', fontsize = 16)
-# plt.title('tanh(x)', fontsize = 16)
+# sig = [sigmoid(x) for x in xLin]
+# dsig = [dsigmoid(x) for x in xLin]
+# plt.plot(xLin, sig, label = '\u03C3(x)')
+# plt.plot(xLin, dsig, label = "\u03C3'(x)")
+# plt.ylabel('y', fontsize = 16)
+# plt.title("\u03C3(x) and \u03C3'(x)", fontsize = 16)
+
+# plt.title("tanh(x) and tanh'(x)", fontsize = 16)
 # tanh = [np.tanh(x) for x in xLin]
-# plt.plot(xLin,tanh)
+# dtanh = [(1-np.tanh(x)**2) for x in xLin]
+# plt.plot(xLin,tanh, label = "tanh(x)")
+# plt.plot(xLin,dtanh, label = "tanh'(x)")
 
 # def reLU(x):
 #     return max(0,x)
 
-# plt.ylabel('ReLU(x)', fontsize = 16)
-# plt.title('Rectified Linear Unit', fontsize = 16)
+# def dreLU(x):
+#     return 0 if x <= 0 else 1
+
+# # plt.ylabel('ReLU(x)', fontsize = 16)
+# xLin1 = np.linspace(-6, 0, 50)
+# xLin2 = np.linspace(1e-8, 6, 50)
+# plt.title("ReLU(x) and ReLU'(x)", fontsize = 16)
 # relu = [reLU(x) for x in xLin]
+# drelu = [dreLU(x) for x in xLin1]
+# plt.plot(xLin,relu,label = "ReLU(x)")
+# plt.plot(xLin1,drelu,label = "ReLU'(x)")
+# drelu = [dreLU(x) for x in xLin2]
+# plt.plot(xLin2,drelu,color = 'orange')
+
+# def LeakyReLU(x):
+#     return max(0.01*x,x)
+
+# plt.ylabel('Leaky ReLU(x)', fontsize = 16)
+# plt.title('Leaky ReLU', fontsize = 16)
+# relu = [LeakyReLU(x) for x in xLin]
 # plt.plot(xLin,relu)
 
-def LeakyReLU(x):
-    return max(0.01*x,x)
+# plt.ylabel('Linear(x)', fontsize = 16)
+plt.title("Linear(x) and Linear'(x)", fontsize = 16)
+dxLin = [1 for _ in range(len(xLin))]
+plt.plot(xLin,xLin,label = "Linear(x)")
+plt.plot(xLin,dxLin,label = "Linear'(x)")
 
-plt.ylabel('Leaky ReLU(x)', fontsize = 16)
-plt.title('Leaky ReLU', fontsize = 16)
-relu = [LeakyReLU(x) for x in xLin]
-plt.plot(xLin,relu)
-
-
+plt.legend(loc = "upper left", fontsize = 16)
 
 
-# %%
 
-# %%
+
 
 # %%

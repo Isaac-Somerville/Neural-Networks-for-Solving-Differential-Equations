@@ -41,7 +41,7 @@ class Fitter(torch.nn.Module):
         self.fc1 = torch.nn.Linear(3, numHiddenNodes)
         self.fcs = torch.nn.ModuleList([torch.nn.Linear(numHiddenNodes, numHiddenNodes)
                     for _ in range(numHiddenLayers-1)])
-        # 1 outputs : u
+        # 1 output : u
         self.fcLast = torch.nn.Linear(numHiddenNodes, 1)
 
         # Initialise lambda1, lambda2 as in paper
@@ -64,8 +64,8 @@ class Fitter(torch.nn.Module):
 
 def train(network, lossFn, optimiser, scheduler, loader, numEpochs):
     """Trains the neural network"""
-    # LBFGS optimiser requires closure function to carry out all
-    # steps except optimiser.step
+    # LBFGS optimiser requires closure function to 
+    # carry out all steps except optimiser.step
     # closure function takes no arguments
     costList=[]
     network.train(True)
@@ -75,7 +75,7 @@ def train(network, lossFn, optimiser, scheduler, loader, numEpochs):
         u_out = network.forward(batch)
 
         du = grad(u_out, batch, torch.ones_like(u_out), retain_graph=True, create_graph=True)[0]
-        # print(du)
+
         d2u = grad(du, batch, torch.ones_like(du), retain_graph=True, create_graph=True)[0]
         # print(d2u)
 
@@ -225,7 +225,7 @@ try: # load saved network if possible
     optimiser = checkpoint['optimiser']
     scheduler = checkpoint['scheduler']
     losses = checkpoint['losses']
-except: # create new network
+except: # create new network otherwise
     epoch = 0
     network    = Fitter(numHiddenNodes=8, numHiddenLayers=4)
     # optimiser  = torch.optim.Adam(network.parameters(), lr = 1e-4)
