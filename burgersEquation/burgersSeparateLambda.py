@@ -46,8 +46,10 @@ class Fitter(torch.nn.Module):
 
     def forward(self, input):
         hidden = torch.tanh(self.fc1(input))
+        print(hidden.shape)
         for i in range(len(self.fcs)):
             hidden = torch.tanh(self.fcs[i](hidden))
+            print(hidden.shape)
         # No activation function on final layer
         out = self.fcLast(hidden)
         return out
@@ -213,7 +215,7 @@ u_exact = Exact.flatten()[:,None]
 # print(u_exact.shape)
 
 # number of training samples
-numSamples = 2000
+numSamples = 25600
 
 # try: # load saved network if possible
 #     checkpoint = torch.load('burgerAdam.pth')
@@ -247,7 +249,7 @@ lambda1List = []
 lambda2List = []
 
 trainData = DataSet(XT, u_exact, numSamples)
-trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples/2), shuffle=True)
+trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples/4), shuffle=True)
 lossFn   = torch.nn.MSELoss()
 # for n in network.parameters():
 #     print(n)

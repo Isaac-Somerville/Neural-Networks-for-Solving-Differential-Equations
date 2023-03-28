@@ -89,14 +89,14 @@ def solution1(x):
 def trialFunc1(x, n_out):
     """
     Trial solution to Lagaris problem 1
-    f(x) = 1 + x * N(x)
+    f(x) = 1 + xN(x)
     """ 
     return 1 + x * n_out
 
 def dTrialFunc1(x, n_out, dndx):
     """
     Derivative of trial solution to Lagaris problem 1
-    f'(x) = N(x) + x * N'(x)
+    f'(x) = N(x) + xN'(x)
     """ 
     return n_out + x * dndx
 
