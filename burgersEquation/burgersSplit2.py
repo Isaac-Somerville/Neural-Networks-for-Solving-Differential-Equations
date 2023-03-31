@@ -3,6 +3,20 @@
 #############
 # Adam optimiser, train for u(x,t), then lambda_i
 # lambda_i are not network parameters
+
+
+# DiffEqLHS with true values of lambda 1 and 2 gives slightly larger loss
+# increase learning rate and continue training on u(x,t)
+
+
+# burgersSplit2.pth: network with only 4 layers
+# burgersSplit3.pth: network with 8 layers, trained to 60000 epochs
+# burgersSplit4.pth: network with from burgersSplit3.pth, 
+#                   further trained after increasing lr to 1e-3
+# burgersSplit5.pth: network with from burgersSplit3.pth,
+#                   further trained after increasing lr to 1e-4 
+#                   with scheduler patience = 5000
+# burgersSplit6.pth: network with 8 layers, scheduler patience = 5000
 #############
 
 import torch
@@ -104,10 +118,10 @@ def trainDE(network, lambda1, lambda2, lossFn, optimiser, scheduler, loader, num
             # print(u_xx)
             
             # With exponential for lambda2
-            # diffEqLHS = u_t + (lambda1 * u_out * u_x) - (torch.exp(lambda2) * u_xx)
+            diffEqLHS = u_t + (lambda1 * u_out * u_x) - (torch.exp(lambda2) * u_xx)
 
             # Without exponential for lambda2
-            diffEqLHS = u_t + (lambda1 * u_out * u_x) - (lambda2 * u_xx)
+            # diffEqLHS = u_t + (lambda1 * u_out * u_x) - (lambda2 * u_xx)
 
             loss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
 
@@ -128,6 +142,10 @@ def trainDE(network, lambda1, lambda2, lossFn, optimiser, scheduler, loader, num
         lambda2List.append(lambda2.item())
 
     print("current DE train loss = ", loss.detach().numpy())
+    trueDiffEq = u_t + (u_out * u_x) - ((0.01/np.pi) * u_xx)
+    trueLoss = lossFn(trueDiffEq, torch.zeros_like(trueDiffEq))
+    print("DE with true lambda values = ", trueLoss.detach().numpy())
+
     
     print("lambda1 = ", lambda1.item())
     # With exponential for lambda2
@@ -163,17 +181,17 @@ def test(network, lambda1, lambda2, XT, u_exact, lossFn):
     # print(u_xx)
 
     # DE with exp(lambda2)
-    # diffEqLHS = u_t + (lambda1 * u_out * u_x) - (torch.exp(lambda2) * u_xx)
+    diffEqLHS = u_t + (lambda1 * u_out * u_x) - (torch.exp(lambda2) * u_xx)
 
     # DE without exp(lambda2), i.e. just with lambda2
-    diffEqLHS = u_t + (lambda1 * u_out * u_x) - (lambda2 * u_xx)
+    # diffEqLHS = u_t + (lambda1 * u_out * u_x) - (lambda2 * u_xx)
 
     # calculate losses for u, DE, lambda1 and lambda2
     uTestLoss = lossFn(u_out, batch[:,2].view(-1,1))
     DETestLoss = lossFn(diffEqLHS, torch.zeros_like(diffEqLHS))
     lambda1Loss = abs(lambda1 - 1.) * 100
-    # lambda2Loss = (abs(torch.exp(lambda2) - ( 0.01 / np.pi)) / (0.01 / np.pi)) * 100
-    lambda2Loss = (abs(lambda2 - ( 0.01 / np.pi)) / (0.01 / np.pi)) * 100
+    lambda2Loss = (abs(torch.exp(lambda2) - ( 0.01 / np.pi)) / (0.01 / np.pi)) * 100
+    # lambda2Loss = (abs(lambda2 - ( 0.01 / np.pi)) / (0.01 / np.pi)) * 100
     print("u_test error = ", uTestLoss.item())
     print("DE_test error = ", DETestLoss.item())
     print("lambda1 error = ", lambda1Loss.item(), " %")
@@ -243,13 +261,26 @@ u_exact = Exact.flatten()[:,None]
 numSamples = 2000
 
 try: # load saved network if possible
-    checkpoint = torch.load('burgersSplit3.pth')
+    checkpoint = torch.load('burgersSplit6.pth')
     epoch = checkpoint['epoch']
     network = checkpoint['network']
     optimiser = checkpoint['optimiser']
     scheduler = checkpoint['scheduler']
     uLosses = checkpoint['uLosses']
     trainData = checkpoint['trainData']
+    print("model loaded")
+    # for g in optimiser.param_groups:
+    #     g['lr'] = 1e-3
+    # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    #     optimiser, 
+    #     factor=0.5, 
+    #     patience=5000, 
+    #     threshold=1e-4, 
+    #     cooldown=0, 
+    #     min_lr=0, 
+    #     eps=1e-8, 
+    #     verbose=True
+    # )
 except: # create new network
     epoch = 0
     network    = Fitter(numHiddenNodes=32, numHiddenLayers=8)
@@ -257,52 +288,54 @@ except: # create new network
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimiser, 
         factor=0.5, 
-        patience=1000, 
+        patience=5000, 
         threshold=1e-4, 
         cooldown=0, 
-        min_lr=0, 
+        min_lr=1e-6, 
         eps=1e-8, 
         verbose=True
     )
     trainData = DataSet(XT, u_exact, numSamples)
     uLosses = []
+    print("model created")
 
-trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples/4), shuffle=True)
+trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples/2), shuffle=True)
 lossFn   = torch.nn.MSELoss()
 # for n in network.parameters():
 #     print(n)
 
-iterations = 1
 numEpochs = 1000 # number of epochs to train each iteration
-while iterations < 101:
-    newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
-    uLosses.extend(newLoss)
-    iterations += 1
-    epoch += numEpochs
+# while epoch < 200000:
+#     newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
+#     uLosses.extend(newLoss)
+#     epoch += numEpochs
 
-    plotNetwork(network, X, T, XT, u_exact, epoch)
+#     plotNetwork(network, X, T, XT, u_exact, epoch)
 
-    plt.semilogy(uLosses)
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.title("Loss")
-    plt.show()
-    if iterations % 10 == 0:
-        # save network
-        checkpoint = { 
-            'epoch': epoch,
-            'network': network,
-            'optimiser': optimiser,
-            'scheduler': scheduler,
-            'uLosses': uLosses,
-            'trainData': trainData
-            }
-        torch.save(checkpoint, 'burgersSplit3.pth')
-
+#     plt.semilogy(uLosses)
+#     plt.xlabel("Epochs")
+#     plt.ylabel("Loss")
+#     plt.title("Loss")
+#     plt.show()
+#     if epoch % 10000 == 0:
+#         # save network
+#         checkpoint = { 
+#             'epoch': epoch,
+#             'network': network,
+#             'optimiser': optimiser,
+#             'scheduler': scheduler,
+#             'uLosses': uLosses,
+#             'trainData': trainData
+#             }
+#         torch.save(checkpoint, 'burgersSplit6.pth')
+#         print("model saved")
 
 
 lambda1 = torch.tensor(torch.rand(1), requires_grad = True) 
-lambda2 = torch.tensor(torch.rand(1), requires_grad = True) 
+lambda2 = torch.tensor(torch.rand(1), requires_grad = True)
+
+# lambda1 = torch.tensor(0., requires_grad = True) 
+# lambda2 = torch.tensor(0.002479, requires_grad = True)  
 
 plotNetwork(network, X, T, XT, u_exact, epoch)
 test(network, lambda1, lambda2, XT, u_exact, lossFn)
@@ -313,7 +346,7 @@ optimiser  = torch.optim.Adam([{"params": lambda1, 'lr' : 1e-3},
 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
     optimiser, 
     factor=0.5, 
-    patience=500, 
+    patience=1000, 
     threshold=1e-4, 
     cooldown=0, 
     min_lr=0, 
@@ -326,7 +359,7 @@ lambda1List = []
 lambda2List = []
 iterations = 0
 numEpochs = 1000 # number of epochs to train each iteration
-while iterations < 10:
+while iterations < 30:
     newLoss, newLambda1, newLambda2 = trainDE(network, lambda1, lambda2, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     DELosses.extend(newLoss)
     lambda1List.extend(newLambda1)
@@ -355,16 +388,12 @@ while iterations < 10:
     plt.show()
 
 print("Final value of lambda1 = ", lambda1.item())
-# print("Final value of lambda2 = ", torch.exp(lambda2).item())
-print("Final value of lambda2 = ", lambda2.item())
+print("Final value of lambda2 = ", torch.exp(lambda2).item())
+# print("Final value of lambda2 = ", lambda2.item())
 print("True value of lambda1 = ", 1.0)
 print("True value of lambda2 = ", 0.01 / np.pi)
 test(network, lambda1, lambda2, XT, u_exact, lossFn)
 # for n in network.parameters():
 #     print(n)
-
-# %%
-
-# %%
 
 # %%

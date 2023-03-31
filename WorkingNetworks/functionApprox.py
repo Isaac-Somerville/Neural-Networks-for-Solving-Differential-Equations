@@ -79,7 +79,6 @@ class Fitter(torch.nn.Module):
         """
         # tanh activation function used on hidden layer
         h = torch.tanh(self.fc1(x))
-        print(h.shape)
         # Linear activation function used on outer layer
         y = self.fc2(h)
         return y

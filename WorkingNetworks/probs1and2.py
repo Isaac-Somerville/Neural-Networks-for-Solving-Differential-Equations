@@ -4,80 +4,106 @@ import torch
 import torch.utils.data
 import numpy as np
 import matplotlib.pyplot as plt
+import time
+from torch.autograd import grad
 
 class DataSet(torch.utils.data.Dataset):
     """Creates range of evenly-spaced x-coordinates as test data"""
-    def __init__(self, num_samples, xrange):
-        self.data_in  = torch.linspace(xrange[0], xrange[1], num_samples, requires_grad=True)
+    def __init__(self, numSamples, xrange):
+        self.dataIn  = torch.linspace(xrange[0], xrange[1], numSamples, requires_grad=True).view(-1,1)
 
     def __len__(self):
-        return len(self.data_in)
+        return len(self.dataIn)
 
     def __getitem__(self, i):
-        return self.data_in[i]
+        return self.dataIn[i]
     
 class Fitter(torch.nn.Module):
-    """Forward propagations"""
-    def __init__(self, num_hidden_nodes):
+    """
+    The neural network object, with 1 node in the input layer,
+    1 node in the output layer, and 1 hidden layer with 'numHiddenNodes' nodes.
+    """
+    def __init__(self, numHiddenNodes):
+        """
+        Arguments:
+        numHiddenNodes (int) -- number of nodes in hidden layer
+
+        Returns:
+        Fitter object (neural network) with two attributes:
+        fc1 (fully connected layer) -- linear transformation of hidden layer
+        fc2 (fully connected layer) -- linear transformation of outer layer
+        """
         super(Fitter, self).__init__()
-        self.fc1 = torch.nn.Linear(1, num_hidden_nodes)
-        self.fc2 = torch.nn.Linear(num_hidden_nodes, 1)
+        self.fc1 = torch.nn.Linear(in_features = 1, out_features = numHiddenNodes)
+        self.fc2 = torch.nn.Linear(in_features = numHiddenNodes, out_features = 1)
 
     def forward(self, x):
-        hidden = torch.sigmoid(self.fc1(x))
-        y = self.fc2(hidden)
-        return y
+        """
+        Function which connects inputs to outputs in the neural network.
 
-def train(network, loader, loss_fn, optimiser, solution, trialFunc, dTrialFunc, diffEq, epochs, iterations):
+        Arguments:
+        x (PyTorch tensor shape (batchSize,1)) -- input of neural network
+
+        Returns:
+        y (PyTorch tensor shape (batchSize,1)) -- output of neural network
+        """
+        # tanh activation function used on hidden layer
+        h = torch.tanh(self.fc1(x))
+        # Linear activation function used on outer layer
+        y = self.fc2(h)
+        return y
+    
+def train(network, loader, lossFn, optimiser, numEpochs):
     """Trains the neural network"""
     cost_list=[]
-    network.train(True)
-    for epoch in range(epochs+1):
+    network.train(True) # set module in training mode
+    for epoch in range(numEpochs):
         for batch in loader:
-            x = batch.view(-1, 1)
-            n_out = network(x)
+            n_out = network.forward(batch) # network output
 
-            # Get the derivative of the network output with respect
-            # to the input values. 
-            dndx = torch.autograd.grad(n_out, x, torch.ones_like(n_out), retain_graph=True, create_graph=True)[0]
-            
-            
+            # Derivative of the network output w.r.t. the input values:
+            dndx = grad(n_out, batch, torch.ones_like(n_out), retain_graph=True)[0]
             # Get value of trial solution f(x)
-            f_trial = trialFunc(x, n_out)
+            f_trial = trialFunc(batch, n_out)
             # Get df / dx
-            df_trial = dTrialFunc(x, n_out, dndx)
-            # Get LHS of diff equation D(x) = 0
-            diff_eq = diffEq(x, f_trial, df_trial)
+            df_trial = dTrialFunc(batch, n_out, dndx)
+            # Get LHS of differential equation G(x) = 0
+            diff_eq = diffEq(batch, f_trial, df_trial)
             
-            # Calculate and store loss
-            loss = loss_fn(diff_eq, torch.zeros_like(diff_eq))
-            cost_list.append(loss.detach().numpy())
+            cost = lossFn(diff_eq, torch.zeros_like(diff_eq)) # calculate cost
+            cost.backward() # perform backpropagation
+            optimiser.step() # perform parameter optimisation
+            optimiser.zero_grad() # reset gradients to zero
 
-            # Back propagation, update weights and biases
-            loss.backward()
-            optimiser.step()
-            optimiser.zero_grad()
-        
-        if epoch%(epochs/5)==0:
-            plotNetwork(network, solution,trialFunc, epoch, epochs, iterations)
-    network.train(False)
+        cost_list.append(cost.detach().numpy())# store cost of each epoch
+    network.train(False) # set module out of training mode
     return cost_list
 
 
-def plotNetwork(network, solution, trialFunc, epoch, epochs, iterations):
+def plotNetwork(network, epoch):
     '''
     Plots the output of the neural network and the analytic solution
     '''
-    x    = torch.Tensor(np.linspace(xrange[0], xrange[1], num_samples)).view(-1,1)
-    N    = network.forward(x).detach().numpy()
+    x    = torch.linspace(xrange[0], xrange[1], 50).view(-1,1)
+    x.requires_grad = True
+    N    = network.forward(x)
+    f_trial = trialFunc(x, N)
+    dndx = grad(N, x, torch.ones_like(N), retain_graph=True, create_graph=True)[0]
+    df_trial = dTrialFunc(x, N, dndx)
+    diff_eq = diffEq(x, f_trial, df_trial)
+    cost = lossFn(diff_eq, torch.zeros_like(diff_eq))
+    print("test cost = ", cost.item())
+    
     exact = solution(x).detach().numpy()
+    x = x.detach().numpy()
+    N = N.detach().numpy()
     plt.plot(x, trialFunc(x,N), 'r-', label = "Neural Network Output")
     plt.plot(x, exact, 'b.', label = "True Solution")
     
     plt.xlabel("x")
     plt.ylabel("f(x)")
-    plt.legend(loc = "lower right")
-    plt.title(str(epoch + iterations*epochs) + " Epochs")
+    plt.legend(loc = "upper left")
+    plt.title(str(epoch) + " Epochs")
     plt.show()
     
 def solution1(x):
@@ -102,7 +128,7 @@ def dTrialFunc1(x, n_out, dndx):
 
 def diffEq1(x, f_trial, df_trial):
     """
-    Returns LHS of differential equation D(x) = 0
+    Returns LHS of differential equation G(x) = 0
     for Lagaris problem 1
     """
     RHS = x**3 + 2*x + (x**2 * ((1+3*x**2) / (1 + x + x**3)))
@@ -130,10 +156,8 @@ def dTrialFunc2(x, n_out, dndx):
     return n_out + x * dndx
 
 def diffEq2(x, f_trial, df_trial):
-    
-    
     """
-    Returns LHS of differential equation D(x) = 0
+    Returns LHS of differential equation G(x) = 0
     for Lagaris problem 2
     """
     RHS = df_trial + (1/5)*f_trial
@@ -141,36 +165,38 @@ def diffEq2(x, f_trial, df_trial):
     return LHS - RHS
     
 xrange=[0, 2]
-num_samples = 30
-network      = Fitter(num_hidden_nodes=10)
-train_set    = DataSet(num_samples,  xrange)
-train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=60, shuffle=True)
-loss_fn      = torch.nn.MSELoss()
-optimiser    = torch.optim.Adam(network.parameters(), lr=1e-2)
+numSamples = 10
+network      = Fitter(numHiddenNodes=10)
+train_set    = DataSet(numSamples,  xrange)
+train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=10, shuffle=True)
+lossFn      = torch.nn.MSELoss()
+optimiser    = torch.optim.SGD(network.parameters(), lr=1e-3)
 
-# solution = solution1
-# trialFunc = trialFunc1
-# dTrialFunc = dTrialFunc1
-# diffEq = diffEq1
+solution = solution1
+trialFunc = trialFunc1
+dTrialFunc = dTrialFunc1
+diffEq = diffEq1
 
-solution = solution2
-trialFunc = trialFunc2
-dTrialFunc = dTrialFunc2
-diffEq = diffEq2
+# solution = solution2
+# trialFunc = trialFunc2
+# dTrialFunc = dTrialFunc2
+# diffEq = diffEq2
 
-losses = [1]
-iterations = 0
-epochs = 5000
-while losses[-1] > 0.001 and iterations < 10:
-    losses.extend( train(network, train_loader, loss_fn, optimiser, solution, 
-                         trialFunc, dTrialFunc, diffEq, epochs, iterations))
-    iterations += 1
-losses = losses[1:]
-print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+costList = []
+epoch = 0
+numEpochs = 1000
+start = time.time()
+while epoch < 1000:
+    costList.extend(train(network, train_loader, lossFn, optimiser, numEpochs))
+    epoch += numEpochs
+    plotNetwork(network, epoch)
+end = time.time()
+print(epoch, "epochs total, final cost = ", costList[-1])
+print("total time elapsed = ", end - start, " seconds")
 
-plt.semilogy(losses)
-plt.xlabel("Epochs")
-plt.ylabel("Log of Loss")
-plt.title("Loss")
+plt.semilogy(costList)
+plt.xlabel("Epochs",fontsize = 16)
+plt.ylabel("Cost",fontsize = 16)
+plt.title("Network Training Cost",fontsize = 16)
 
 # %%
