@@ -16,7 +16,9 @@
 # burgersSplit5.pth: network with from burgersSplit3.pth,
 #                   further trained after increasing lr to 1e-4 
 #                   with scheduler patience = 5000
-# burgersSplit6.pth: network with 8 layers, scheduler patience = 5000
+# burgersSplit6.pth: network with 8 layers, scheduler patience = 500
+# burgersSplit7.pth: network with 8 layers, scheduler patience = 10000
+#                      batchsize = numsamples
 #############
 
 import torch
@@ -261,7 +263,7 @@ u_exact = Exact.flatten()[:,None]
 numSamples = 2000
 
 try: # load saved network if possible
-    checkpoint = torch.load('burgersSplit6.pth')
+    checkpoint = torch.load('burgersSplit7.pth')
     epoch = checkpoint['epoch']
     network = checkpoint['network']
     optimiser = checkpoint['optimiser']
@@ -288,7 +290,7 @@ except: # create new network
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimiser, 
         factor=0.5, 
-        patience=5000, 
+        patience=10000, 
         threshold=1e-4, 
         cooldown=0, 
         min_lr=1e-6, 
@@ -299,36 +301,36 @@ except: # create new network
     uLosses = []
     print("model created")
 
-trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples/2), shuffle=True)
+trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples), shuffle=True)
 lossFn   = torch.nn.MSELoss()
 # for n in network.parameters():
 #     print(n)
 
 numEpochs = 1000 # number of epochs to train each iteration
-# while epoch < 200000:
-#     newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
-#     uLosses.extend(newLoss)
-#     epoch += numEpochs
+while epoch < 500000:
+    newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
+    uLosses.extend(newLoss)
+    epoch += numEpochs
 
-#     plotNetwork(network, X, T, XT, u_exact, epoch)
+    plotNetwork(network, X, T, XT, u_exact, epoch)
 
-#     plt.semilogy(uLosses)
-#     plt.xlabel("Epochs")
-#     plt.ylabel("Loss")
-#     plt.title("Loss")
-#     plt.show()
-#     if epoch % 10000 == 0:
-#         # save network
-#         checkpoint = { 
-#             'epoch': epoch,
-#             'network': network,
-#             'optimiser': optimiser,
-#             'scheduler': scheduler,
-#             'uLosses': uLosses,
-#             'trainData': trainData
-#             }
-#         torch.save(checkpoint, 'burgersSplit6.pth')
-#         print("model saved")
+    plt.semilogy(uLosses)
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.title("Loss")
+    plt.show()
+    if epoch % 10000 == 0:
+        # save network
+        checkpoint = { 
+            'epoch': epoch,
+            'network': network,
+            'optimiser': optimiser,
+            'scheduler': scheduler,
+            'uLosses': uLosses,
+            'trainData': trainData
+            }
+        torch.save(checkpoint, 'burgersSplit7.pth')
+        print("model saved")
 
 
 lambda1 = torch.tensor(torch.rand(1), requires_grad = True) 

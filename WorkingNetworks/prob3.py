@@ -3,139 +3,248 @@ import torch
 import torch.utils.data
 import numpy as np
 import matplotlib.pyplot as plt
+from torch.autograd import grad
+import time
 
 class DataSet(torch.utils.data.Dataset):
-    """Creates range of evenly-spaced x-coordinates as test data"""
-    def __init__(self, num_samples, xrange):
-        self.data_in  = torch.linspace(xrange[0], xrange[1], num_samples, requires_grad=True)
+    """
+    An object which generates the x values for the input node 
+    """
+    def __init__(self, numSamples, xRange):
+        """
+        Arguments:
+        xRange (list of length 2) -- lower and upper limits for input values x
+        numSamples (int) -- number of training data samples
+
+        Returns:
+        DataSet object with one attributes:
+            dataIn (PyTorch tensor of shape (numSamples,1)) -- 'numSamples'
+                evenly-spaced data points from xRange[0] to xRange[1]
+        """
+        self.dataIn  = torch.linspace(xRange[0], xRange[1], numSamples, requires_grad=True).view(-1,1)
+        # 'view' method reshapes tensors, in this case into a column vector
 
     def __len__(self):
-        return len(self.data_in)
+        """
+        Arguments:
+        None
 
-    def __getitem__(self, i):
-        return self.data_in[i]
+        Returns:
+        len(self.dataIn) (int) -- number of training data points
+        """
+        return len(self.dataIn)
+
+    def __getitem__(self, idx):
+        """
+        Used by DataLoader object to retrieve training data points
+
+        Arguments:
+        idx (int) -- index of data point required
+        
+        Returns:
+        x (tensor shape (1,1)) -- data point at index 'idx'
+        """
+        return self.dataIn[idx]
     
 class Fitter(torch.nn.Module):
-    """Forward propagations"""
-    def __init__(self, num_hidden_nodes):
+    """
+    The neural network object, with 1 node in the input layer,
+    1 node in the output layer, and 1 hidden layer with 'numHiddenNodes' nodes.
+    """
+    def __init__(self, numHiddenNodes):
+        """
+        Arguments:
+        numHiddenNodes (int) -- number of nodes in hidden layer
+
+        Returns:
+        Fitter object (neural network) with two attributes:
+        fc1 (fully connected layer) -- linear transformation of hidden layer
+        fc2 (fully connected layer) -- linear transformation of outer layer
+        """
         super(Fitter, self).__init__()
-        self.fc1 = torch.nn.Linear(1, num_hidden_nodes)
-        self.fc2 = torch.nn.Linear(num_hidden_nodes, 1)
+        self.fc1 = torch.nn.Linear(in_features = 1, out_features = numHiddenNodes)
+        self.fc2 = torch.nn.Linear(in_features = numHiddenNodes, out_features = 1)
 
     def forward(self, x):
-        hidden = torch.sigmoid(self.fc1(x))
-        y = self.fc2(hidden)
+        """
+        Function which connects inputs to outputs in the neural network.
+
+        Arguments:
+        x (PyTorch tensor shape (batchSize,1)) -- input of neural network
+
+        Returns:
+        y (PyTorch tensor shape (batchSize,1)) -- output of neural network
+        """
+        # tanh activation function used on hidden layer
+        h = torch.tanh(self.fc1(x))
+        # Linear activation function used on outer layer
+        y = self.fc2(h)
         return y
 
-def train(network, loader, loss_fn, optimiser, solution, trialFunc, dTrialFunc, d2TrialFunc, diffEq, epochs, iterations):
-    """Trains the neural network"""
+def train(network, loader, lossFn, optimiser, numEpochs):
+    """
+    A function to train a neural network to solve a 
+    second-order ODE with Cauchy boundary conditions.
+
+    Arguments:
+    network (Module) -- the neural network
+    loader (DataLoader) -- generates batches from the training dataset
+    lossFn (Loss Function) -- network's loss function
+    optimiser (Optimiser) -- carries out parameter optimisation
+    numEpochs (int) -- number of training epochs
+
+    Returns:
+    cost_list (list of length 'numEpochs') -- cost values of all epochs
+    """
     cost_list=[]
     network.train(True)
-    for epoch in range(epochs+1):
+    for epoch in range(numEpochs):
         for batch in loader:
-            x = batch.view(-1, 1)
-            n_out = network(x)
+            n_out = network(batch)
 
-            # Get the derivative of the network output with respect
-            # to the input values. 
-            dndx = torch.autograd.grad(n_out, x, torch.ones_like(n_out), retain_graph=True, create_graph=True)[0]
-            d2ndx2 = torch.autograd.grad(dndx, x, torch.ones_like(dndx), retain_graph=True, create_graph=True)[0]
+            # Get first derivative of the network output with respect to the input values: 
+            dndx = grad(n_out, batch, torch.ones_like(n_out), retain_graph=True, create_graph=True)[0]
+            # Get second derivative of the network output with respect to the input values: 
+            d2ndx2 =grad(dndx, batch, torch.ones_like(dndx), retain_graph=True)[0]
             
             # Get value of trial solution f(x)
-            f_trial = trialFunc(x, n_out)
-            # Get df / dx
-            df_trial = dTrialFunc(x, n_out, dndx)
-            # Get d^2f / dx^2
-            d2f_trial = d2TrialFunc(x,n_out,dndx,d2ndx2)
-            # Get LHS of diff equation D(x) = 0
-            diff_eq = diffEq(x, f_trial, df_trial, d2f_trial)
+            f_trial = trialFunc(batch, n_out)
+            # Get f'(x)
+            df_trial = dTrialFunc(batch, n_out, dndx)
+            # Get f''(x)
+            d2f_trial = d2TrialFunc(batch,n_out,dndx,d2ndx2)
+            # Get LHS of differential equation D(x) = 0
+            diff_eq = diffEq(batch, f_trial, df_trial, d2f_trial)
             
-            loss = loss_fn(diff_eq, torch.zeros_like(diff_eq))
-            cost_list.append(loss.detach().numpy())
-            loss.backward()
-            optimiser.step()
-            optimiser.zero_grad()
-        if epoch%(epochs/5)==0:
-            plotNetwork(network, solution,trialFunc, epoch, epochs, iterations)
+            cost = lossFn(diff_eq, torch.zeros_like(diff_eq)) # calculate cost
+            # torch.zeros_like(x) creates a tensor the same shape as x, filled with 0's
+            cost.backward() # perform backpropagation
+            optimiser.step() # perform parameter optimisation
+            optimiser.zero_grad() # reset gradients to zero
+
+        cost_list.append(cost.detach().numpy())# store cost of each epoch
     network.train(False)
     return cost_list
 
 
-def plotNetwork(network, solution, trialFunc, epoch, epochs, iterations):
-    x    = torch.Tensor(np.linspace(xrange[0], xrange[1], num_samples)).view(-1,1)
-    N    = network.forward(x).detach().numpy()
-    exact = solution(x).detach().numpy()
+def plotNetwork(network, epoch):
+    x    = torch.linspace(xRange[0], xRange[1], 60, requires_grad=True).view(-1,1)
+    N    = network.forward(x)
+    f_trial = trialFunc(x, N)
+    dndx = grad(N, x, torch.ones_like(N), retain_graph=True, create_graph=True)[0]  
+    d2ndx2 =grad(dndx, x, torch.ones_like(dndx), retain_graph=True)[0]
+    df_trial = dTrialFunc(x, N, dndx)
+    d2f_trial = d2TrialFunc(x,N,dndx,d2ndx2)
+    diff_eq = diffEq(x, f_trial, df_trial, d2f_trial)
+    cost = lossFn(diff_eq, torch.zeros_like(diff_eq))
+    print("test cost = ", cost.item())
+
+
+    exact = solution(x)
+    MSECost = lossFn(f_trial, exact)
+    print("MSE between trial and exact solution = ", MSECost.item())
+    exact = exact.detach().numpy()
+    x = x.detach().numpy()
+    N = N.detach().numpy()
     plt.plot(x, trialFunc(x,N), 'r-', label = "Neural Network Output")
     plt.plot(x, exact, 'b.', label = "True Solution")
     
-    plt.xlabel("x")
-    plt.ylabel("f(x)")
-    plt.legend(loc = "lower right")
-    plt.title(str(epoch + iterations*epochs) + " Epochs")
+    plt.xlabel("x", fontsize = 16)
+    plt.ylabel("f(x)", fontsize = 16)
+    plt.legend(loc = "upper right", fontsize = 16)
+    plt.title(str(epoch) + " Epochs", fontsize = 16)
     plt.show()
+    return
     
-    
-def solution3(x):
-    """
-    Analytic solution to Lagaris problem 3
-    """
-    return torch.exp(-x/5) * torch.sin(x)
 
-def trialFunc3(x, n_out):
+def trialFunc(x, n_out):
     """
-    Trial solution to Lagaris problem 3
-    f(x) = x + x^2 * N(x)
+    Trial solution to Lagaris problem 3: f(x) = x + x^2 * N(x)
+    Arguments:
+        x (tensor of shape (batchSize,1)) -- input of neural network
+        n_out (tensor of shape (batchSize,1)) -- output of neural network
+    Returns:
+        x + (x**2 * n_out) (tensor of shape (batchSize,1)) -- trial solution to differential equation
     """ 
     return x + (x**2 * n_out)
 
-def dTrialFunc3(x, n_out, dndx):
+def dTrialFunc(x, n_out, dndx):
     """
-    Derivative of trial solution to Lagaris problem 3
-    f'(x) = 1 + 2xN(x) + x^2 * N'(x)
+    First derivative of trial solution to Lagaris problem 3: f'(x) = 1 + 2xN(x) + x^2 * N'(x)
+    Arguments:
+        x (tensor of shape (batchSize,1)) -- input of neural network
+        n_out (tensor of shape (batchSize,1)) -- output of neural network
+        dndx (tensor of shape (batchSize,1)) -- derivative of n_out w.r.t. x
+    Returns:
+        1 + (2*x*n_out) + (x**2 * dndx) (tensor of shape (batchSize,1)) -- 1st derivative of trial function w.r.t. x)
     """ 
     return 1 + (2*x*n_out) + (x**2 * dndx)
 
-def d2TrialFunc3(x,n_out,dndx,d2ndx2):
+def d2TrialFunc(x,n_out,dndx,d2ndx2):
     """
-    Second derivative of trial solution to Lagaris problem 3
-    f''(x) = 2N(x) + (4x * N'(x)) + x^2 N''(x)
+    Second derivative of trial solution to Lagaris problem 3: f''(x) = 2N(x) + (4x * N'(x)) + x^2 N''(x)
+    Arguments:
+        x (tensor of shape (batchSize,1)) -- input of neural network
+        n_out (tensor of shape (batchSize,1)) -- output of neural network
+        dndx (tensor of shape (batchSize,1)) -- 1st derivative of n_out w.r.t. x
+        d2ndx2 (tensor of shape (batchSize,1)) -- 2nd derivative of n_out w.r.t. x
+    Returns:
+        2*n_out + (4*x*dndx) + (x**2 * d2ndx2) (tensor of shape (batchSize,1)) -- 2nd derivative of trial function w.r.t. x)
     """ 
     return 2*n_out + (4*x*dndx) + (x**2 * d2ndx2)
 
-def diffEq3(x, f_trial, df_trial, d2f_trial):
+def diffEq(x, f_trial, df_trial, d2f_trial):
     """
-    Returns LHS of differential equation D(x) = 0
-    for Lagaris problem 1
+    Returns D(x) of differential equation D(x) = 0 from Lagaris problem 3
+    Arguments:
+        x (tensor of shape (batchSize,1)) -- input of neural network
+        f_trial (tensor of shape (batchSize,1)) -- trial solution at x
+        df_trial (tensor of shape (batchSize,1)) -- 1st derivative of trial solution at x
+        d2f_trial (tensor of shape (batchSize,1)) -- 2nd derivative of trial solution at x
+    Returns:
+        LHS - RHS (tensor of shape (batchSize,1)) -- differential equation evaluated at x
     """
     LHS = d2f_trial + (1/5)*df_trial + f_trial
     RHS = -(1/5) * torch.exp(-x/5) * torch.cos(x)
     return LHS - RHS
+
+def solution(x):
+    """
+    Analytic solution to Lagaris problem 3
+    Arguments:
+        x (tensor of shape (batchSize,1)) -- input of neural network
+    Returns:
+        y (tensor of shape (batchSize,1)) -- analytic solution of differential equation at x
+    """
+    y = torch.exp(-x/5) * torch.sin(x)
+    return y
     
-xrange=[0, 2]
-num_samples = 30
-network      = Fitter(num_hidden_nodes=10)
-train_set    = DataSet(num_samples,  xrange)
-train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=60, shuffle=True)
-loss_fn      = torch.nn.MSELoss()
-optimiser    = torch.optim.Adam(network.parameters(), lr=1e-2)
+xRange       = [0, 10]
+numSamples   = 50
+batchSize    = 50
+trainData    = DataSet(numSamples, xRange)
+trainLoader  = torch.utils.data.DataLoader(dataset=trainData, batch_size=batchSize, shuffle=True)
+network      = Fitter(numHiddenNodes=10)
+lossFn       = torch.nn.MSELoss()
+optimiser    = torch.optim.Adam(network.parameters(), lr=1e-3)
 
-solution = solution3
-trialFunc = trialFunc3
-dTrialFunc = dTrialFunc3
-d2TrialFunc = d2TrialFunc3
-diffEq = diffEq3
+costList    = []
+epoch       = 0
+numEpochs   = 1000
+totalEpochs = 20000
 
-losses = [1]
-iterations = 0
-epochs = 5000
-while losses[-1] > 0.001 and iterations < 10:
-    losses.extend( train(network, train_loader, loss_fn, optimiser, solution, 
-                         trialFunc, dTrialFunc, d2TrialFunc, diffEq, epochs, iterations))
-    iterations += 1
-losses = losses[1:]
-print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+start = time.time()
+while epoch < totalEpochs:
+    costList.extend(train(network, trainLoader, lossFn, optimiser, numEpochs))
+    epoch += numEpochs
+end = time.time()
 
-plt.semilogy(losses)
-plt.xlabel("Epochs")
-plt.ylabel("Log of Loss")
-plt.title("Loss")
+print("total time elapsed = ", end-start, " seconds")
+print(epoch, "epochs total, final cost = ", costList[-1])
+
+plotNetwork(network, epoch)
+plt.semilogy(costList)
+plt.xlabel("Epochs",fontsize = 16)
+plt.ylabel("Cost",fontsize = 16)
+plt.title("Training Cost",fontsize = 16)
+plt.show()
