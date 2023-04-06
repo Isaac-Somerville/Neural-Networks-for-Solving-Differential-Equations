@@ -128,7 +128,7 @@ def train(network, loader, lossFn, optimiser, numEpochs):
 
 
 def plotNetwork(network, epoch):
-    x    = torch.linspace(xRange[0], xRange[1], 60, requires_grad=True).view(-1,1)
+    x    = torch.linspace(-5, 15, 120, requires_grad=True).view(-1,1)
     N    = network.forward(x)
     f_trial = trialFunc(x, N)
     dndx = grad(N, x, torch.ones_like(N), retain_graph=True, create_graph=True)[0]  
@@ -139,6 +139,27 @@ def plotNetwork(network, epoch):
     cost = lossFn(diff_eq, torch.zeros_like(diff_eq))
     print("test cost = ", cost.item())
 
+    # x1    = torch.linspace(-5, 0, 20, requires_grad=True).view(-1,1)
+    # N1    = network.forward(x1)
+    # f_trial1 = trialFunc(x1, N1)
+    # dndx = grad(N1, x1, torch.ones_like(N1), retain_graph=True, create_graph=True)[0]  
+    # d2ndx2 =grad(dndx, x1, torch.ones_like(dndx), retain_graph=True)[0]
+    # df_trial = dTrialFunc(x1, N1, dndx)
+    # d2f_trial = d2TrialFunc(x1,N1,dndx,d2ndx2)
+    # diff_eq = diffEq(x1, f_trial1, df_trial, d2f_trial)
+    # cost = lossFn(diff_eq, torch.zeros_like(diff_eq))
+    # print("test cost = ", cost.item())
+
+    # x2    = torch.linspace(10, 15, 20, requires_grad=True).view(-1,1)
+    # N2    = network.forward(x2)
+    # f_trial2 = trialFunc(x2, N2)
+    # dndx = grad(N2, x2, torch.ones_like(N2), retain_graph=True, create_graph=True)[0]  
+    # d2ndx2 =grad(dndx, x2, torch.ones_like(dndx), retain_graph=True)[0]
+    # df_trial = dTrialFunc(x2, N2, dndx)
+    # d2f_trial = d2TrialFunc(x2,N2,dndx,d2ndx2)
+    # diff_eq = diffEq(x2, f_trial2, df_trial, d2f_trial)
+    # cost = lossFn(diff_eq, torch.zeros_like(diff_eq))
+    # print("test cost = ", cost.item())
 
     exact = solution(x)
     MSECost = lossFn(f_trial, exact)
@@ -148,11 +169,35 @@ def plotNetwork(network, epoch):
     N = N.detach().numpy()
     plt.plot(x, trialFunc(x,N), 'r-', label = "Neural Network Output")
     plt.plot(x, exact, 'b.', label = "True Solution")
+    # plt.plot(x, exact, 'b.', label = "True Solution, Training Range")
+
+
+    # exact1 = solution(x1)
+    # MSECost = lossFn(f_trial1, exact1)
+    # print("MSE between trial and exact1 solution = ", MSECost.item())
+    # exact1 = exact1.detach().numpy()
+    # x1 = x1.detach().numpy()
+    # N1 = N1.detach().numpy()
+    # plt.plot(x1, trialFunc(x1,N1), 'r-')
+    # plt.plot(x1, exact1, 'g.', label = "True Solution, New Range")
+
+    # exact2 = solution(x2)
+    # MSECost = lossFn(f_trial2, exact2)
+    # print("MSE between trial and exact2 solution = ", MSECost.item())
+    # exact2 = exact2.detach().numpy()
+    # x2 = x2.detach().numpy()
+    # N2 = N2.detach().numpy()
+    # plt.plot(x2, trialFunc(x2,N2), 'r-')
+    # plt.plot(x2, exact2, 'g.')
     
     plt.xlabel("x", fontsize = 16)
     plt.ylabel("f(x)", fontsize = 16)
     plt.legend(loc = "upper right", fontsize = 16)
-    plt.title(str(epoch) + " Epochs", fontsize = 16)
+    plt.title("Lagaris Problem 3: " + str(epoch) + " Epochs", fontsize = 16)
+    # plt.title("Lagaris Problem 3: Right Extrapolation", fontsize = 16)
+    # ax = plt.gca()
+    # ax.set_ylim([-4, 2.7])
+    # ax.set_xlim([100, 20100])
     plt.show()
     return
     
@@ -164,8 +209,7 @@ def trialFunc(x, n_out):
         x (tensor of shape (batchSize,1)) -- input of neural network
         n_out (tensor of shape (batchSize,1)) -- output of neural network
     Returns:
-        x + (x**2 * n_out) (tensor of shape (batchSize,1)) -- trial solution to differential equation
-    """ 
+        x + (x**2 * n_out) (tensor of shape (batchSize,1)) -- trial solution to differential equation""" 
     return x + (x**2 * n_out)
 
 def dTrialFunc(x, n_out, dndx):
@@ -176,8 +220,7 @@ def dTrialFunc(x, n_out, dndx):
         n_out (tensor of shape (batchSize,1)) -- output of neural network
         dndx (tensor of shape (batchSize,1)) -- derivative of n_out w.r.t. x
     Returns:
-        1 + (2*x*n_out) + (x**2 * dndx) (tensor of shape (batchSize,1)) -- 1st derivative of trial function w.r.t. x)
-    """ 
+        1 + (2*x*n_out) + (x**2 * dndx) (tensor of shape (batchSize,1)) -- 1st derivative of trial function w.r.t. x)""" 
     return 1 + (2*x*n_out) + (x**2 * dndx)
 
 def d2TrialFunc(x,n_out,dndx,d2ndx2):
@@ -189,8 +232,7 @@ def d2TrialFunc(x,n_out,dndx,d2ndx2):
         dndx (tensor of shape (batchSize,1)) -- 1st derivative of n_out w.r.t. x
         d2ndx2 (tensor of shape (batchSize,1)) -- 2nd derivative of n_out w.r.t. x
     Returns:
-        2*n_out + (4*x*dndx) + (x**2 * d2ndx2) (tensor of shape (batchSize,1)) -- 2nd derivative of trial function w.r.t. x)
-    """ 
+        2*n_out + (4*x*dndx) + (x**2 * d2ndx2) (tensor of shape (batchSize,1)) -- 2nd derivative of trial function w.r.t. x)""" 
     return 2*n_out + (4*x*dndx) + (x**2 * d2ndx2)
 
 def diffEq(x, f_trial, df_trial, d2f_trial):
@@ -202,8 +244,7 @@ def diffEq(x, f_trial, df_trial, d2f_trial):
         df_trial (tensor of shape (batchSize,1)) -- 1st derivative of trial solution at x
         d2f_trial (tensor of shape (batchSize,1)) -- 2nd derivative of trial solution at x
     Returns:
-        LHS - RHS (tensor of shape (batchSize,1)) -- differential equation evaluated at x
-    """
+        LHS - RHS (tensor of shape (batchSize,1)) -- differential equation evaluated at x"""
     LHS = d2f_trial + (1/5)*df_trial + f_trial
     RHS = -(1/5) * torch.exp(-x/5) * torch.cos(x)
     return LHS - RHS
@@ -214,30 +255,54 @@ def solution(x):
     Arguments:
         x (tensor of shape (batchSize,1)) -- input of neural network
     Returns:
-        y (tensor of shape (batchSize,1)) -- analytic solution of differential equation at x
-    """
-    y = torch.exp(-x/5) * torch.sin(x)
-    return y
+        torch.exp(-x/5) * torch.sin(x) (tensor of shape (batchSize,1)) -- analytic solution of differential equation at x"""
+    return torch.exp(-x/5) * torch.sin(x)
     
+
+try: # load saved network and cost list, if possible
+    checkpoint = torch.load('problem3InitialNetwork.pth')
+    network    = checkpoint['network']
+    costList   = checkpoint['costList']
+except: # create new network and cost list
+    network     = Fitter(numHiddenNodes=10)
+    costList    = []
+    checkpoint  = {'network': network,
+                  'costList': costList}
+    torch.save(checkpoint, 'problem3InitialNetwork.pth')
+
+# networkName  = 'Network1'
+networkName  = 'Network2'
+
 xRange       = [0, 10]
 numSamples   = 50
 batchSize    = 50
 trainData    = DataSet(numSamples, xRange)
 trainLoader  = torch.utils.data.DataLoader(dataset=trainData, batch_size=batchSize, shuffle=True)
-network      = Fitter(numHiddenNodes=10)
-lossFn       = torch.nn.MSELoss()
-optimiser    = torch.optim.Adam(network.parameters(), lr=1e-3)
 
-costList    = []
-epoch       = 0
+xRangeWide       = [-5, 15]
+numSamplesWide   = 100
+batchSizeWide    = 100
+trainDataWide    = DataSet(numSamplesWide, xRangeWide)
+trainLoaderWide  = torch.utils.data.DataLoader(dataset=trainDataWide, batch_size=batchSizeWide, shuffle=True)
+
+lossFn      = torch.nn.MSELoss()
+optimiser   = torch.optim.Adam(network.parameters(), lr=1e-3)
+epoch       = 0 
 numEpochs   = 1000
-totalEpochs = 20000
+totalEpochs = 40000
 
 start = time.time()
 while epoch < totalEpochs:
-    costList.extend(train(network, trainLoader, lossFn, optimiser, numEpochs))
+    if networkName == 'Network1' and epoch < 20000:
+        costList.extend(train(network, trainLoader, lossFn, optimiser, numEpochs))
+    else:
+        costList.extend(train(network, trainLoaderWide, lossFn, optimiser, numEpochs))
     epoch += numEpochs
 end = time.time()
+
+checkpoint  = {'network': network,
+                'costList': costList,}
+torch.save(checkpoint, 'problem3' + networkName + '.pth')
 
 print("total time elapsed = ", end-start, " seconds")
 print(epoch, "epochs total, final cost = ", costList[-1])
@@ -246,5 +311,26 @@ plotNetwork(network, epoch)
 plt.semilogy(costList)
 plt.xlabel("Epochs",fontsize = 16)
 plt.ylabel("Cost",fontsize = 16)
-plt.title("Training Cost",fontsize = 16)
+plt.title("Lagaris Problem 3: Training Cost",fontsize = 16)
 plt.show()
+
+"""
+without curriculum:
+total time elapsed =  190.89399981498718  seconds
+40000 epochs total, final cost =  0.0023449727
+test cost =  0.0023396711330860853
+MSE between trial and exact solution =  0.0020627330522984266
+
+with curriculum:
+total time elapsed =  63.931313037872314  seconds
+20000 epochs total, final cost =  6.160468e-05
+test cost =  6.0600799770327285e-05
+MSE between trial and exact solution =  2.0995989871153142e-06
+
+after 40000 epochs : 
+total time elapsed =  90.92937588691711  seconds
+40000 epochs total, final cost =  0.00024475207
+test cost =  0.00024454688536934555
+MSE between trial and exact solution =  4.911488576908596e-05
+
+"""
