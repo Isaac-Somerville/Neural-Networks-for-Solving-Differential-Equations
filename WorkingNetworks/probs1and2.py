@@ -6,6 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from torch.autograd import grad
+# from torch.profiler import profile, record_function, ProfilerActivity
+import torch.autograd.profiler as profiler
 
 class DataSet(torch.utils.data.Dataset):
     """
@@ -259,7 +261,7 @@ except: # create new network
     # torch.save(checkpoint, 'problem2.pth')
 xRange       = [0, 2]
 numSamples   = 20
-batchSize    = 20
+batchSize    = 1
 paramUpdates = 20000
 train_set    = DataSet(numSamples, xRange)
 train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=batchSize, shuffle=True)
@@ -278,12 +280,17 @@ diffEq = diffEq1
 
 costList = []
 epoch = 0
-numEpochs = 1000
-totalEpochs = int((batchSize/numSamples) * paramUpdates)
+numEpochs = 50
+# totalEpochs = int((batchSize/numSamples) * paramUpdates)
+totalEpochs = 100
 start = time.time()
-while epoch < totalEpochs:
-    costList.extend(train(network, train_loader, lossFn, optimiser, numEpochs))
-    epoch += numEpochs
+with profiler.profile(profile_memory=True) as prof:
+    while epoch < totalEpochs:
+        costList.extend(train(network, train_loader, lossFn, optimiser, numEpochs))
+        epoch += numEpochs
+        print(epoch)
+print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10))
+print(prof.total_average())
 end = time.time()
 
 
