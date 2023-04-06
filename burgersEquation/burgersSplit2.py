@@ -307,7 +307,7 @@ lossFn   = torch.nn.MSELoss()
 #     print(n)
 
 numEpochs = 1000 # number of epochs to train each iteration
-while epoch < 500000:
+while epoch < 800000:
     newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     uLosses.extend(newLoss)
     epoch += numEpochs
