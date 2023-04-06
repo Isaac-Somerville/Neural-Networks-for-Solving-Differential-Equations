@@ -87,29 +87,29 @@ class DESolver(torch.nn.Module):
         y = self.fc2(h)
         return y
     
-def f1_trial( x, n1_out):
+def f1Trial(x, n1_out):
     """Trial solution f1(x) to first DE"""
     return x * n1_out
 
-def df1_trial( x, n1_out, dn1dx):
+def df1Trial( x, n1_out, dn1dx):
     """Derivative of trial solution f1'(x) to first DE"""
     return n1_out + (x * dn1dx)
 
-def f2_trial( x, n2_out):
+def f2Trial(x, n2_out):
     """Trial solution f2(x) to second DE"""
     return 1 + (x * n2_out)
 
-def df2_trial( x, n2_out, dn2dx):
+def df2Trial(x, n2_out, dn2dx):
     """Derivative of trial solution f2'(x) to second DE"""
     return n2_out + (x * dn2dx)
 
-def diffEq1( x, f1_trial, f2_trial, df1_trial):
+def diffEq1(x, f1_trial, f2_trial, df1_trial):
     """Returns D1(x) where first DE is D1(x) = 0"""
     LHS = df1_trial
     RHS = (torch.cos(x) + ((f1_trial)**2 + f2_trial - (1 + (x)**2 + (torch.sin(x))**2)))
     return LHS - RHS
 
-def diffEq2( x, f1_trial, f2_trial, df2_trial):
+def diffEq2(x, f1_trial, f2_trial, df2_trial):
     """Returns D2(x) where second DE is D2(x) = 0"""
     LHS = df2_trial
     RHS = (2*x + ((-(1 + (x)**2)*torch.sin(x)) + (f1_trial*f2_trial)))
@@ -153,11 +153,11 @@ def train(network, loader, lossFn, optimiser, numEpochs):
             dn2dx = grad(n2_out, batch, torch.ones_like(n2_out), retain_graph=True)[0]
 
             # Get value of trial solutions f1(x), f2(x)
-            f1_trial = f1_trial(batch, n1_out)
-            f2_trial = f2_trial(batch, n2_out)
+            f1_trial = f1Trial(batch, n1_out)
+            f2_trial = f2Trial(batch, n2_out)
             # Get f1'(x) and f2'(x)
-            df1_trial = df1_trial(batch, n1_out, dn1dx)
-            df2_trial = df2_trial(batch, n2_out, dn2dx)
+            df1_trial = df1Trial(batch, n1_out, dn1dx)
+            df2_trial = df2Trial(batch, n2_out, dn2dx)
             # Get LHS of differential equations D1(x) = 0, D2(x) = 0
             D1 = diffEq1(batch, f1_trial, f2_trial, df1_trial)
             D2 = diffEq2(batch, f1_trial, f2_trial, df2_trial)
@@ -166,7 +166,6 @@ def train(network, loader, lossFn, optimiser, numEpochs):
             cost1 = lossFn(D1, torch.zeros_like(D1))
             cost2 = lossFn(D2, torch.zeros_like(D2))
             cost = cost1 + cost2
-            cost_list.append(cost.detach().numpy())
             
             cost.backward() # perform backpropagation
             optimiser.step() # perform parameter optimisation
@@ -183,7 +182,7 @@ def plotNetwork(network, epoch):
     Plots the outputs of both neural networks, along with the
     analytic solution in the same range
     """
-    x    = torch.linspace(xRange[0], xRange[1], numSamples, requires_grad=True).view(-1,1)
+    x    = torch.linspace(totalXRange[0], totalXRange[1], 36, requires_grad=True).view(-1,1)
     n_out    = network.forward(x)
     n1_out, n2_out = torch.split(n_out, split_size_or_sections=1, dim=1)
 
@@ -192,11 +191,11 @@ def plotNetwork(network, epoch):
     dn2dx = grad(n2_out, x, torch.ones_like(n2_out), retain_graph=True)[0]
 
     # Get value of trial solutions f1(x), f2(x)
-    f1_trial = f1_trial(x, n1_out)
-    f2_trial = f2_trial(x, n2_out)
+    f1_trial = f1Trial(x, n1_out)
+    f2_trial = f2Trial(x, n2_out)
     # Get f1'(x) and f2'(x)
-    df1_trial = df1_trial(x, n1_out, dn1dx)
-    df2_trial = df2_trial(x, n2_out, dn2dx)
+    df1_trial = df1Trial(x, n1_out, dn1dx)
+    df2_trial = df2Trial(x, n2_out, dn2dx)
     # Get LHS of differential equations D1(x) = 0, D2(x) = 0
     D1 = diffEq1(x, f1_trial, f2_trial, df1_trial)
     D2 = diffEq2(x, f1_trial, f2_trial, df2_trial)
@@ -216,17 +215,19 @@ def plotNetwork(network, epoch):
     x = x.detach().numpy()
     exact1 = exact1.detach().numpy()
     exact2 = exact2.detach().numpy()
+    f1_trial = f1_trial.detach().numpy()
+    f2_trial = f2_trial.detach().numpy()
     
-    plt.plot(x, f1_trial, 'r-', label = "f(x) Trial Solution")
-    plt.plot(x, exact1, 'b.', label = "f(x) Exact Solution")
+    plt.plot(x, f1_trial, 'r-', label = "f\u2081(x) Trial Solution")
+    plt.plot(x, exact1, 'b.', label = "f\u2081(x) Exact Solution")
     plt.xlabel("x")
     plt.ylabel("y")
-    plt.legend(loc = "lower center", fontsize = 16)
+    plt.legend(loc = "lower left", fontsize = 16)
     plt.title("Network 1: " + str(epoch) + " Epochs", fontsize = 16)
     plt.show()
     
-    plt.plot(x, f2_trial, 'r-', label = "g(x) Trial Solution")
-    plt.plot(x, exact2, 'b.', label = "g(x) Exact Solution")
+    plt.plot(x, f2_trial, 'r-', label = "f\u2082(x) Trial Solution")
+    plt.plot(x, exact2, 'b.', label = "f\u2082(x) Exact Solution")
     
     plt.xlabel("x",fontsize = 16)
     plt.ylabel("y",fontsize = 16)
@@ -234,11 +235,19 @@ def plotNetwork(network, epoch):
     plt.title("Network 2: " + str(epoch) + " Epochs",fontsize = 16)
     plt.show()
 
-network     = DESolver(num_hidden_nodes=16)
+
+# try: # load saved network if possible
+#     checkpoint = torch.load('problem4InitialNetwork.pth')
+#     network    = checkpoint['network']
+# except: # create new network
+#     network    = DESolver(numHiddenNodes=16)
+#     checkpoint = {'network': network}
+#     torch.save(checkpoint, 'problem4InitialNetwork.pth')
+network     = DESolver(numHiddenNodes=16)
 lossFn      = torch.nn.MSELoss()
-optimiser   = torch.optim.Adam(network.parameters(), lr = 1e-2)
-xRange      = [0,3]
-numSamples  = 30
+optimiser   = torch.optim.Adam(network.parameters(), lr = 1e-3)
+totalXRange      = [0,3]
+numTotalSamples  = 30
 
 # ranges = [[0., 0.25], [0.25,0.5],[0.5,0.75], [0.75,1.], [0,1]]
 # succeeds
@@ -261,53 +270,47 @@ numSamples  = 30
 # ranges = [ [0.66,1],[0.33,0.66], [0,0.33], [0,1]]
 # succeeds
 
-ranges = [[0,3]]
+# ranges = [[0,3]]
 # fails
 
-# ranges = [[0,1],[0,2],[0,3]]
+ranges = [[0,1],[0,2],[0,3]]
 # succeeds
 
 # ranges = [[0,1.5], [0,3]]
 # fails
 
 costList = []
-numEpochs = 0
-for i in range(len(ranges)):
-    xrange = ranges[i]
-    # if i == len(ranges) - 1:
-    #     num_samples = 30
-    # else:
-    #     num_samples = 15
+epoch = 0
+numEpochs = 1000
+totalEpochs = 30000
+epochsPerSubRange = int(totalEpochs / len(ranges))
+for subRange in ranges:
+    epochCounter = 0
+    numSamples = int(10 * (subRange[1] - subRange[0]))
+    trainData    = DataSet(numSamples, subRange)
+    trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples), shuffle=True)
+
+    while epochCounter < epochsPerSubRange:
+        costList.extend(train(network, trainLoader, lossFn, optimiser, numEpochs))
+        epoch += numEpochs
+        epochCounter += numEpochs
     
-    num_samples = 30
-
-    # num_samples = int(10 * (i+1) + 1)
-
-    train_set    = DataSet(xrange, num_samples)
-    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=int(num_samples/3), shuffle=True)
-
-    iterations = 0
-    numEpochs = 1000
-    while iterations < 50:
-        newLoss = train(network, train_loader, lossFn, optimiser,)
-        losses.extend(newLoss)
-        iterations += 1
-    losses = losses[1:]
-    allLosses += losses
-    totalEpochs += numEpochs * iterations
-    print(f"{iterations*numEpochs} numEpochs total, final loss = {losses[-1]}")
-
-    plt.semilogy(losses)
-    plt.xlabel("numEpochs")
-    plt.ylabel("Error")
-    plt.title("Error")
+    plt.semilogy(costList)
+    plt.xlabel("Epochs")
+    plt.ylabel("Cost")
+    plt.title("Training Cost")
     plt.show()
+    plotNetwork(network,epoch)
 
-plt.semilogy(allLosses)
-plt.xlabel("numEpochs", fontsize = 16)
-plt.ylabel("Error", fontsize = 16)
-plt.title("Error", fontsize = 16)
-plt.show()
-plotNetwork(network, diffEq, totalEpochs, 0, 0, [0,3])
+    
+print(f"{totalEpochs} numEpochs total, final cost = {costList[-1]}")
+# plt.semilogy(costList)
+# plt.xlabel("numEpochs", fontsize = 16)
+# plt.ylabel("Error", fontsize = 16)
+# plt.title("Error", fontsize = 16)
+# plt.show()
+# plotNetwork(network, epoch)
+# %%
+
 # %%
 
