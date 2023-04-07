@@ -64,13 +64,6 @@ class DESolver(torch.nn.Module):
         self.fc1 = torch.nn.Linear(in_features = 1, out_features = numHiddenNodes)
         self.fc2 = torch.nn.Linear(in_features = numHiddenNodes, out_features = 2)
 
-    # def forward(self, x):
-    #     hidden = torch.tanh(self.fc1(x))
-    #     y = self.fc2(hidden1)
-    #     y  = y.transpose(0,1)
-    #     y1, y2 = y[0].view(-1,1), y[1].view(-1,1)
-    #     return y1, y2
-
     def forward(self, x):
         """
         Function which connects inputs to outputs in the neural network.
@@ -81,7 +74,7 @@ class DESolver(torch.nn.Module):
         Returns:
         y (PyTorch tensor shape (batchSize,2)) -- output of neural network
         """
-        # tanh activation function used on hidden layer
+        # sigmoid activation function used on hidden layer
         h = torch.tanh(self.fc1(x))
         # Linear activation function used on outer layer
         y = self.fc2(h)
@@ -106,20 +99,21 @@ def df2Trial(x, n2_out, dn2dx):
 def diffEq1(x, f1_trial, f2_trial, df1_trial):
     """Returns D1(x) where first DE is D1(x) = 0"""
     LHS = df1_trial
-    RHS = (torch.cos(x) + ((f1_trial)**2 + f2_trial - (1 + (x)**2 + (torch.sin(x))**2)))
+    RHS = torch.cos(x) + (f1_trial**2 + f2_trial) - (1 + x**2 + torch.sin(x)**2)
     return LHS - RHS
-
+# - + , + - always works
+# original is + -, - +
 def diffEq2(x, f1_trial, f2_trial, df2_trial):
     """Returns D2(x) where second DE is D2(x) = 0"""
     LHS = df2_trial
-    RHS = (2*x + ((-(1 + (x)**2)*torch.sin(x)) + (f1_trial*f2_trial)))
+    RHS = 2*x - ((1 + x**2)*torch.sin(x)) + (f1_trial*f2_trial)
     return LHS - RHS
 
 def solution1(x):
     """Analytic solution to first DE"""
     return torch.sin(x)
 
-def solution2( x):
+def solution2(x):
     """Analytic solution to second DE"""
     return 1 + x**2
 
@@ -142,15 +136,15 @@ def train(network, loader, lossFn, optimiser, numEpochs):
     network.train(True) # set module in training mode
     for epoch in range(numEpochs):
         for batch in loader:
-            n_out = network.forward(batch) # output of neural network
+            n_out = network.forward(batch)
 
             # Separate two columns of output (one for f1, one for f2)
             # Using torch.split retains tensor history for autograd
             n1_out, n2_out = torch.split(n_out, split_size_or_sections=1, dim=1)
 
             # Get the derivative of both networks' outputs with respect to the input values. 
-            dn1dx = grad(n1_out, batch, torch.ones_like(n1_out), retain_graph=True)[0]
-            dn2dx = grad(n2_out, batch, torch.ones_like(n2_out), retain_graph=True)[0]
+            dn1dx = grad(n1_out, batch, torch.ones_like(n1_out), retain_graph=True, create_graph=True)[0]
+            dn2dx = grad(n2_out, batch, torch.ones_like(n2_out), retain_graph=True, create_graph=True)[0]
 
             # Get value of trial solutions f1(x), f2(x)
             f1_trial = f1Trial(batch, n1_out)
@@ -187,8 +181,8 @@ def plotNetwork(network, epoch):
     n1_out, n2_out = torch.split(n_out, split_size_or_sections=1, dim=1)
 
     # Get the derivative of both networks' outputs with respect to the input values. 
-    dn1dx = grad(n1_out, x, torch.ones_like(n1_out), retain_graph=True)[0]
-    dn2dx = grad(n2_out, x, torch.ones_like(n2_out), retain_graph=True)[0]
+    dn1dx = grad(n1_out, x, torch.ones_like(n1_out), retain_graph=True, create_graph=True)[0]
+    dn2dx = grad(n2_out, x, torch.ones_like(n2_out), retain_graph=True, create_graph=True)[0]
 
     # Get value of trial solutions f1(x), f2(x)
     f1_trial = f1Trial(x, n1_out)
@@ -210,7 +204,7 @@ def plotNetwork(network, epoch):
     exact2 = solution2(x)
     MSE1 = lossFn(f1_trial, exact1)
     MSE2 = lossFn(f2_trial, exact2)
-    print("MSE between trial and exact solutions = ", (MSE1 + MSE2)/2)
+    print("MSE between trial and exact solutions = ", ((MSE1 + MSE2)/2).item())
 
     x = x.detach().numpy()
     exact1 = exact1.detach().numpy()
@@ -218,21 +212,33 @@ def plotNetwork(network, epoch):
     f1_trial = f1_trial.detach().numpy()
     f2_trial = f2_trial.detach().numpy()
     
+    # plt.plot(x, f1_trial, 'r-', label = "f\u2081(x) Trial Solution")
+    # plt.plot(x, exact1, 'b.', label = "f\u2081(x) Exact Solution")
+    # plt.xlabel("x",fontsize = 16)
+    # plt.ylabel("y",fontsize = 16)
+    # plt.legend(loc = "lower center", fontsize = 16)
+    # plt.title("Network 1: " + str(epoch) + " Epochs", fontsize = 16)
+    # plt.show()
+    
+    # plt.plot(x, f2_trial, 'r-', label = "f\u2082(x) Trial Solution")
+    # plt.plot(x, exact2, 'b.', label = "f\u2082(x) Exact Solution")
+    
+    # plt.xlabel("x",fontsize = 16)
+    # plt.ylabel("y",fontsize = 16)
+    # plt.legend(loc = "upper left",fontsize = 16)
+    # plt.title("Network 2: " + str(epoch) + " Epochs",fontsize = 16)
+    # plt.show()
+        
     plt.plot(x, f1_trial, 'r-', label = "f\u2081(x) Trial Solution")
     plt.plot(x, exact1, 'b.', label = "f\u2081(x) Exact Solution")
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.legend(loc = "lower left", fontsize = 16)
-    plt.title("Network 1: " + str(epoch) + " Epochs", fontsize = 16)
-    plt.show()
     
-    plt.plot(x, f2_trial, 'r-', label = "f\u2082(x) Trial Solution")
-    plt.plot(x, exact2, 'b.', label = "f\u2082(x) Exact Solution")
+    plt.plot(x, f2_trial, 'm-', label = "f\u2082(x) Trial Solution")
+    plt.plot(x, exact2, 'c.', label = "f\u2082(x) Exact Solution")
     
     plt.xlabel("x",fontsize = 16)
     plt.ylabel("y",fontsize = 16)
     plt.legend(loc = "upper left",fontsize = 16)
-    plt.title("Network 2: " + str(epoch) + " Epochs",fontsize = 16)
+    plt.title("Example 4: " + str(epoch) + " Epochs",fontsize = 16)
     plt.show()
 
 
@@ -249,40 +255,36 @@ optimiser   = torch.optim.Adam(network.parameters(), lr = 1e-3)
 totalXRange      = [0,3]
 numTotalSamples  = 30
 
-# ranges = [[0., 0.25], [0.25,0.5],[0.5,0.75], [0.75,1.], [0,1]]
-# succeeds
- 
-# ranges = [[0.75,1.],[0.5,0.75], [0.25,0.5],[0., 0.25],[0,1]]
-# succeeds 
+###### TRAINING ON SUBINTERVALS OF INCREASING SIZE, STARTING FROM 0
+# ranges = [[0,3]]  # fails 8.423211693298072e-05, 4.97
+# ranges = [[0,1.5], [0,3]]  # succeeds 7.001220365054905e-05, 3.14 \times 10^{-4}
+# ranges = [[0,1],[0,2],[0,3]]  # succeeds  1.481836170569295e-05 2.63 \times 10^{-4}
 
-# ranges = [[0,0.5], [0.5,1.], [0,1]]
-# fails
+###### TRAINNG ON NON-INTERSECTING SUBERINTERVALS, STARTING FROM 0
+# ranges = [[0,1.5], [1.5,3]] # succeeds but suboptimal solution 6.24 \times 10^{-3}, 1.85 \times 10^{-3}
+# ranges = [[0,1],[1,2],[2,3]] # succeeds but suboptimal solution 5.30 \times 10^{-3}, 1.62 \times 10^{-3}
 
-# ranges = [[0,0.5],[0,1]]
-# fails
+###### TRAINNG ON NON-INTERSECTING SUBERINTERVALS, THEN FULL INTERVAL, STARTING FROM 0
+# ranges = [[0,1.5], [1.5,3], [0,3]] # succeeds 2.2057407477404922e-05  1.84 \times 10^{-4}
+# ranges = [[0,1],[1,2],[2,3],[0,3]] # succeeds 7.5498546721064486e-06, 1.69 \times 10^{-4}
 
-# ranges = [[0.5,1],[0,0.5],[0,1]]
-# succeeds
+###### TRAINING ON SUBINTERVALS OF INCREASING SIZE, STARTING FROM 3
+# ranges = [[1.5,3], [0,3]]  # fails 1.93 \times 10^{-4}, 5.80
+# ranges = [[2,3],[1,3],[0,3]]  # fails, 2.58 \times 10^{-4}, 6.35
+# ranges = [[2.25,3],[1.5,3],[0.75,3],[0,3]] # fails 7.86 \times 10^{-4}, 7.75
 
-#ranges = [[0,0.33], [0.33,0.66], [0.66,1], [0,1]]
-#succeeds
+###### TRAINNG ON NON-INTERSECTING SUBERINTERVALS, THEN FULL INTERVAL, STARTING FROM 3
+# ranges = [[1.5,3], [0,1.5], [0,3]] # succeeds 6.55 \times 10^{-4}, 4.39 \times 10^{-4}
+# ranges = [[2,3],[1,2],[0,1],[0,3]] # succeeds 1.82 \times 10^{-5}, 7.85 \times 10^{-4}
 
-# ranges = [ [0.66,1],[0.33,0.66], [0,0.33], [0,1]]
-# succeeds
-
-# ranges = [[0,3]]
-# fails
-
-ranges = [[0,1],[0,2],[0,3]]
-# succeeds
-
-# ranges = [[0,1.5], [0,3]]
-# fails
+###### TRAINNG ON NON-INTERSECTING SUBERINTERVALS, STARTING FROM 3
+# ranges = [[1.5,3], [0,1.5]] # succeeds, 7.21 \times 10^{-3} 1.62 \times 10^{-3}
+ranges = [[2,3],[1,2],[0,1]] # fails
 
 costList = []
 epoch = 0
 numEpochs = 1000
-totalEpochs = 30000
+totalEpochs = 36000
 epochsPerSubRange = int(totalEpochs / len(ranges))
 for subRange in ranges:
     epochCounter = 0
@@ -294,16 +296,18 @@ for subRange in ranges:
         costList.extend(train(network, trainLoader, lossFn, optimiser, numEpochs))
         epoch += numEpochs
         epochCounter += numEpochs
+        # if epochCounter % 10000 == 0:
+        #     plotNetwork(network,epoch)
     
     plt.semilogy(costList)
-    plt.xlabel("Epochs")
-    plt.ylabel("Cost")
-    plt.title("Training Cost")
+    plt.xlabel("Epochs",fontsize = 16)
+    plt.ylabel("Cost",fontsize = 16)
+    plt.title("Example 4: Training Cost",fontsize = 16)
     plt.show()
     plotNetwork(network,epoch)
 
     
-print(f"{totalEpochs} numEpochs total, final cost = {costList[-1]}")
+print(f"{totalEpochs} epochs total, final cost = {costList[-1]}")
 # plt.semilogy(costList)
 # plt.xlabel("numEpochs", fontsize = 16)
 # plt.ylabel("Error", fontsize = 16)
