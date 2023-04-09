@@ -41,15 +41,15 @@ class DataSet(torch.utils.data.Dataset):
         XT_train = torch.tensor(XT[idx,:], requires_grad=True).float()
         u_train = torch.tensor(u_exact[idx,:], requires_grad=True).float()
 
-        # input of forward function must have shape (batch_size, 3)
-        self.data_in = torch.cat((XT_train,u_train),1)
+        # input of forward function must have shape (batch_size, 2)
+        self.data_in = (XT_train, u_train)
         
     def __len__(self):
-        return self.data_in.shape[0]
+        return self.data_in[0].shape[0]
 
 
     def __getitem__(self, i):
-        return self.data_in[i,:]
+        return (self.data_in[0][i,:], self.data_in[1][i])
 
 class Fitter(torch.nn.Module):
     """Forward propagations"""
@@ -77,8 +77,7 @@ def trainU(network, lossFn, optimiser, scheduler, loader, numEpochs):
     network.train(True)
     for _ in range(numEpochs):
         for batch in loader:
-            x, t, batch_u_exact = torch.split(batch, 1, dim =1)
-            input = torch.cat((x,t), dim=1)
+            input, batch_u_exact = batch
             u_out = network.forward(input)
             # print(u_out)
             # print(u_exact)
@@ -107,8 +106,7 @@ def trainDE(network, lambda1, lambda2, lossFn, optimiser, scheduler, loader, num
     network.train(True)
     for _ in range(numEpochs):
         for batch in loader:
-            x, t, batch_u_exact = torch.split(batch, 1, dim =1)
-            input = torch.cat((x,t), dim=1)
+            input, batch_u_exact = batch
             u_out = network.forward(input)
             # print(u_out)
             du = grad(u_out, input, torch.ones_like(u_out), retain_graph=True, create_graph=True)[0]
@@ -168,9 +166,7 @@ def test(network, lambda1, lambda2, XT, u_exact, lossFn):
     Tests network solution on all 25600 sample points
     """
     testData = DataSet(XT , u_exact, XT.shape[0])
-    batch = testData.data_in
-    x, t, batch_u_exact = torch.split(batch, 1, dim =1)
-    input = torch.cat((x,t), dim=1)
+    input, batch_u_exact = testData.data_in
     u_out = network.forward(input)
 
     du = grad(u_out, input, torch.ones_like(u_out), retain_graph=True, create_graph=True)[0]
@@ -266,7 +262,7 @@ u_exact = Exact.flatten()[:,None]
 numSamples = 2000
 
 try: # load saved network if possible
-    checkpoint = torch.load('burgersSplitCorrected.pth')
+    checkpoint = torch.load('burgersSplitTest.pth')
     epoch = checkpoint['epoch']
     network = checkpoint['network']
     optimiser = checkpoint['optimiser']
@@ -309,7 +305,7 @@ lossFn   = torch.nn.MSELoss()
 # for n in network.parameters():
 #     print(n)
 
-numEpochs = 10000 # number of epochs to train each iteration
+numEpochs = 1000 # number of epochs to train each iteration
 while epoch < 100000:
     newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     uLosses.extend(newLoss)
@@ -330,7 +326,7 @@ while epoch < 100000:
         'uLosses': uLosses,
         'trainData': trainData
         }
-    torch.save(checkpoint, 'burgersSplitCorrected.pth')
+    torch.save(checkpoint, 'burgersSplitTest.pth')
     print("model saved")
 
 
