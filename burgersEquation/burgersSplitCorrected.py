@@ -42,6 +42,8 @@ class DataSet(torch.utils.data.Dataset):
         u_train = torch.tensor(u_exact[idx,:], requires_grad=True).float()
 
         # input of forward function must have shape (batch_size, 2)
+        # u-values for training must have shape (batch_size, 1)
+        # we load this data as a tuple of tensors
         self.data_in = (XT_train, u_train)
         
     def __len__(self):
@@ -262,7 +264,7 @@ u_exact = Exact.flatten()[:,None]
 numSamples = 2000
 
 try: # load saved network if possible
-    checkpoint = torch.load('burgersSplitTest.pth')
+    checkpoint = torch.load('burgersSplit2000Patience.pth')
     epoch = checkpoint['epoch']
     network = checkpoint['network']
     optimiser = checkpoint['optimiser']
@@ -289,7 +291,7 @@ except: # create new network
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimiser, 
         factor=0.5, 
-        patience=5000, 
+        patience=2000, 
         threshold=1e-4, 
         cooldown=0, 
         min_lr=1e-6, 
@@ -305,8 +307,8 @@ lossFn   = torch.nn.MSELoss()
 # for n in network.parameters():
 #     print(n)
 
-numEpochs = 1000 # number of epochs to train each iteration
-while epoch < 100000:
+numEpochs = 10000 # number of epochs to train each iteration
+while epoch < 200000:
     newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     uLosses.extend(newLoss)
     epoch += numEpochs
@@ -326,7 +328,7 @@ while epoch < 100000:
         'uLosses': uLosses,
         'trainData': trainData
         }
-    torch.save(checkpoint, 'burgersSplitTest.pth')
+    torch.save(checkpoint, 'burgersSplit2000Patience.pth')
     print("model saved")
 
 
@@ -358,7 +360,7 @@ lambda1List = []
 lambda2List = []
 iterations = 0
 numEpochs = 1000 # number of epochs to train each iteration
-while iterations < 30:
+while iterations < 40:
     newLoss, newLambda1, newLambda2 = trainDE(network, lambda1, lambda2, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     DELosses.extend(newLoss)
     lambda1List.extend(newLambda1)

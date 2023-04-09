@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 from torch.autograd import grad
+from torch.profiler import profile, record_function, ProfilerActivity
 
 class DataSet(torch.utils.data.Dataset):
     """
@@ -249,8 +250,8 @@ while epoch < totalEpochs:
     epoch += numEpochs
 end = time.time()
 
-costsDict[algorithm] = costList # store cost list for each algorithm in a dictionary
-torch.save(costsDict, 'problem2Costs.pth') # save dictionary
+# costsDict[algorithm] = costList # store cost list for each algorithm in a dictionary
+# torch.save(costsDict, 'problem2Costs.pth') # save dictionary
 
 plotNetwork(network, algorithm, epoch)
 plt.semilogy(costList)

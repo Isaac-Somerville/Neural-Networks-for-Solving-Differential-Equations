@@ -19,6 +19,8 @@
 # burgersSplit6.pth: network with 8 layers, scheduler patience = 500
 # burgersSplit7.pth: network with 8 layers, scheduler patience = 10000
 #                      batchsize = numsamples
+# burgersSplit8.pth: network with 8 layers, scheduler patience = 5000
+#                      batchsize = numsamples
 #############
 
 import torch
@@ -263,7 +265,7 @@ u_exact = Exact.flatten()[:,None]
 numSamples = 2000
 
 try: # load saved network if possible
-    checkpoint = torch.load('burgersSplit7.pth')
+    checkpoint = torch.load('burgersSplit8.pth')
     epoch = checkpoint['epoch']
     network = checkpoint['network']
     optimiser = checkpoint['optimiser']
@@ -290,7 +292,7 @@ except: # create new network
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimiser, 
         factor=0.5, 
-        patience=10000, 
+        patience=5000, 
         threshold=1e-4, 
         cooldown=0, 
         min_lr=1e-6, 
@@ -306,8 +308,8 @@ lossFn   = torch.nn.MSELoss()
 # for n in network.parameters():
 #     print(n)
 
-numEpochs = 1000 # number of epochs to train each iteration
-while epoch < 800000:
+numEpochs = 10000 # number of epochs to train each iteration
+while epoch < 500000:
     newLoss = trainU(network, lossFn, optimiser, scheduler, trainLoader, numEpochs)
     uLosses.extend(newLoss)
     epoch += numEpochs
@@ -319,18 +321,16 @@ while epoch < 800000:
     plt.ylabel("Loss")
     plt.title("Loss")
     plt.show()
-    if epoch % 10000 == 0:
-        # save network
-        checkpoint = { 
-            'epoch': epoch,
-            'network': network,
-            'optimiser': optimiser,
-            'scheduler': scheduler,
-            'uLosses': uLosses,
-            'trainData': trainData
-            }
-        torch.save(checkpoint, 'burgersSplit7.pth')
-        print("model saved")
+    checkpoint = { 
+        'epoch': epoch,
+        'network': network,
+        'optimiser': optimiser,
+        'scheduler': scheduler,
+        'uLosses': uLosses,
+        'trainData': trainData
+        }
+    torch.save(checkpoint, 'burgersSplit8.pth')
+    print("model saved")
 
 
 lambda1 = torch.tensor(torch.rand(1), requires_grad = True) 
