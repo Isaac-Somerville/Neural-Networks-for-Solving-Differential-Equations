@@ -3,279 +3,406 @@ import torch
 import torch.utils.data
 import numpy as np
 import matplotlib.pyplot as plt
+from torch.autograd import grad
 
 # TODO: CLEAN UP CODE 
-# Experiment with uniform sampling of grid points?
 
-class DataSet(torch.utils.data.Dataset):
-    """Creates range of evenly-spaced x- and y-coordinates as test data"""
-    def __init__(self, xrange, yrange, num_samples):
-        # self.data_in  = torch.rand(num_samples, requires_grad=True)
-        X  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True)
-        Y  = torch.linspace(yrange[0],yrange[1],num_samples, requires_grad=True)
+class LinearDataSet(torch.utils.data.Dataset):
+    """
+    An object which generates a lattice of (x,y) values for the input node 
+    """
+    def __init__(self, xRange, yRange, numSamples):
+        """
+        Arguments:
+        xRange (list of length 2) -- lower and upper limits for input values x
+        yRange (list of length 2) -- lower and upper limits for input values y
+        numSamples (int) -- number of training data samples along each axis
+
+        Returns:
+        DataSet object with one attributes:
+            dataIn (PyTorch tensor of shape (numSamples^2,2)) -- 'numSamples'^2
+                evenly-spaced grid points from (xRange[0], yRange[0]) to (xRange[1], yRange[1])
+        """
+        X  = torch.linspace(xRange[0],xRange[1],numSamples, requires_grad=True)
+        Y  = torch.linspace(yRange[0],yRange[1],numSamples, requires_grad=True)
         grid = torch.meshgrid(X,Y)
+        # meshgrid takes Cartesian product of tensors X and Y, returns a tuple of tensors
+        # (x-values, y-values) each of shape (numSamples, numSamples)
         self.data_in = torch.cat((grid[0].reshape(-1,1),grid[1].reshape(-1,1)),1)
-        # print(self.data_in)
+        # reshape data into shape (numSamples^2,2)
 
     def __len__(self):
+        """
+        Arguments:
+        None
+        Returns:
+        len(self.dataIn) (int) -- number of training data points
+        """
         return self.data_in.shape[0]
-
+    
     def __getitem__(self, i):
+        """
+        Used by DataLoader object to retrieve training data points
+
+        Arguments:
+        idx (int) -- index of data point required
+        
+        Returns:
+        [x,y] (tensor shape (1,2)) -- data point at index 'idx'
+        """
+        return self.data_in[i]
+    
+
+class UniformDataSet(torch.utils.data.Dataset):
+    """
+    An object which generates uniformly sampled (x,y) values for the input node 
+    """
+    def __init__(self, xRange, yRange, numSamples):
+        """
+        Arguments:
+        xRange (list of length 2) -- lower and upper limits for input values x
+        yRange (list of length 2) -- lower and upper limits for input values y
+        numSamples (int) -- number of training data samples along each axis
+
+        Returns:
+        DataSet object with one attributes:
+            dataIn (PyTorch tensor of shape (numSamples^2,2)) -- 'numSamples'^2
+                uniformly sampled grid points from (xRange[0], yRange[0]) to (xRange[1], yRange[1])
+        """
+        # uniformly sample numSamples^2 x-values in xRange
+        X  = torch.distributions.Uniform(xRange[0],xRange[1]).sample((int(numSamples**2),1))
+        X.requires_grad = True
+        # uniformly sample numSamples^2 y-values in yRange
+        Y  = torch.distributions.Uniform(yRange[0],yRange[1]).sample((int(numSamples**2),1))
+        Y.requires_grad = True
+
+        # format these 100 (x,y) coordinates in a tensor of shape (numSamples^2,2)
+        self.data_in = torch.cat((X,Y),1)
+
+    def __len__(self):
+        """
+        Arguments:
+        None
+        Returns:
+        len(self.dataIn) (int) -- number of training data points
+        """
+        return self.data_in.shape[0]
+    
+    def __getitem__(self, i):
+        """
+        Used by DataLoader object to retrieve training data points
+
+        Arguments:
+        idx (int) -- index of data point required
+        
+        Returns:
+        [x,y] (tensor shape (1,2)) -- data point at index 'idx'
+        """
         return self.data_in[i]
 
-class Fitter(torch.nn.Module):
-    """Forward propagations"""
-    def __init__(self, num_hidden_nodes):
-        super(Fitter, self).__init__()
-        self.fc1 = torch.nn.Linear(2, num_hidden_nodes)
-        self.fc2 = torch.nn.Linear(num_hidden_nodes, 1)
+class PDESolver(torch.nn.Module):
+    """
+    The neural network object, with 2 nodes in the input layer,
+    1 node in the output layer, and 1 hidden layer with 'numHiddenNodes' nodes.
+    """
+    def __init__(self, numHiddenNodes):
+        """
+        Arguments:
+        numHiddenNodes (int) -- number of nodes in hidden layer
+
+        Returns:
+        PDESolver object (neural network) with two attributes:
+        fc1 (fully connected layer) -- linear transformation of hidden layer
+        fc2 (fully connected layer) -- linear transformation of outer layer
+        """
+        super(PDESolver, self).__init__()
+        self.fc1 = torch.nn.Linear(in_features = 2, out_features = numHiddenNodes)
+        self.fc2 = torch.nn.Linear(in_features = numHiddenNodes, out_features = 1)
 
     def forward(self, input):
-        hidden = torch.sigmoid(self.fc1(input))
-        z = self.fc2(hidden)
+        """
+        Function which connects inputs to outputs in the neural network.
+
+        Arguments:
+        input (PyTorch tensor shape (batchSize,2)) -- input of neural network
+
+        Returns:
+        z (PyTorch tensor shape (batchSize,1)) -- output of neural network
+        """
+        # tanh activation function used on hidden layer
+        h = torch.tanh(self.fc1(input))
+        # Linear activation function used on outer layer
+        z = self.fc2(h)
         return z
 
-class DiffEq():
+def trial_term(x,y):
     """
-    Differential equation from Lagaris et al. problem 7
-    This problem is a PDE in two variables, with mixed
-    boundary conditions
+    First term B(x,y) in trial solution that helps to satisfy BCs
+    f(0,y) = 0, f(1,y) = 0, f(x,0) = 0, f_{y}(x,1) = 2*sin(pi*x)
+    B(x,y) = y * 2 * sin(pi*x)
     """
-    def __init__(self, xrange, yrange, num_samples):
-        self.xrange = xrange
-        self.yrange = yrange
-        self.num_samples = num_samples
+    return 2 * y * torch.sin(np.pi * x)
 
-    def solution(self, x, y):
-        return (y**2) * torch.sin(np.pi * x)
+def trial(x,y,n_outXY,n_outX1,n_outX1_y):
+    return trial_term(x,y) + x*(1-x)*y*(n_outXY - n_outX1 - n_outX1_y)
 
-    def trial_term(self,x,y):
-        """
-        First term B(x,y) in trial solution that helps to satisfy BCs
-        f(0,y) = 0, f(1,y) = 0, f(x,0) = 0, f_{y}(x,1) = 2*sin(pi*x)
-        B(x,y) = y * 2 * sin(pi*x)
-        """
-        return 2 * y * torch.sin(np.pi * x)
+def dx_trial(x,y,n_outXY, n_outX1, n_outX1_y, n_outXY_x, n_outX1_x, n_outX1_xy):
+    """
+    f_x = 2*y*pi*cos(pi*x) + 
+                y * [(1-2*x)(N - N(x,1) - N_{y}(x,1)) 
+                    + x(1-x)(N_{x} - N_{x}(x,1) - N_{xy}(x,1)]
+    """
+    return ( 2* y *np.pi * torch.cos(np.pi*x) 
+            + y * ((1-2*x) * (n_outXY - n_outX1 - n_outX1_y)
+                + x*(1-x)*(n_outXY_x - n_outX1_x - n_outX1_xy)))
 
-    def trial(self,x,y,n_xy,n_x1,dndy_x1):
-        return self.trial_term(x,y) + x*(1-x)*y*(n_xy - n_x1 - dndy_x1)
+def dx2_trial(x,y,n_outXY, n_outX1, n_outX1_y, n_outXY_x, n_outX1_x, n_outX1_xy, n_outXY_xx, n_outX1_xx, n_outX1_xxy):
+    """
+    f_xx = -2*y*pi^2*sin(pi*x) 
+                + y [ (-2)*(N - N(x,1) - N_{y}(x,1)
+                        + 2(1-2x)((N_{x} - N_{x}(x,1) - N_{xy}(x,1))
+                        + x(1-x)(N_{xx} - N_{xx}(x,1) - N_{xxy}(x,1))]"""
+    return ( -2* y *(np.pi)**2 * torch.sin(np.pi*x) 
+            + y * ( (-2) * (n_outXY - n_outX1 - n_outX1_y)
+                + 2*(1-2*x) * (n_outXY_x - n_outX1_x - n_outX1_xy)
+                + x*(1-x)*(n_outXY_xx - n_outX1_xx - n_outX1_xxy)))
 
-    def dx_trial(self,x,y,n_xy, n_x1, dndy_x1, dndx, dndx_x1, dndydx_x1):
-        """
-        df / dx = 2*y*pi*cos(pi*x) + 
-                    y * [(1-2*x)(N - N(x,1) - N_{y}(x,1)) 
-                        + x(1-x)(N_{x} - N_{x}(x,1) - N_{xy}(x,1)]
-        """
-        return ( 2* y *np.pi * torch.cos(np.pi*x) 
-                + y * ((1-2*x) * (n_xy - n_x1 - dndy_x1)
-                    + x*(1-x)*(dndx - dndx_x1 - dndydx_x1)))
+def dy_trial(x,y, n_outXY, n_outX1, n_outX1_y, n_outXY_y):
+    """
+    f_y = 2sin(pi*x) + 
+            + x(1-x)[(N - N(x,1) - N_{y}(x,1)) + y * N_{y}]
+    """
+    return (2*torch.sin(np.pi *x) + x*(1-x) *
+        ((n_outXY - n_outX1 - n_outX1_y) + (y* n_outXY_y)))
 
-    def dx2_trial(self, x,y,n_xy, n_x1, dndy_x1, dndx, dndx_x1, dndydx_x1, dndx2, dndx2_x1, dndydx2_x1):
-        """
-        d^2f / dx^2 = -2*y*pi^2*sin(pi*x) 
-                    + y * [ (-2)*(N - N(x,1) - N_{y}(x,1)
-                            + 2(1-2x)((N_{x} - N_{x}(x,1) - N_{xy}(x,1))
-                            + x(1-x)(N_{xx} - N_{xx}(x,1) - N_{xxy}(x,1))]"""
-        return ( -2* y *(np.pi)**2 * torch.sin(np.pi*x) 
-                + y * ( (-2) * (n_xy - n_x1 - dndy_x1)
-                    + 2*(1-2*x) * (dndx - dndx_x1 - dndydx_x1)
-                    + x*(1-x)*(dndx2 - dndx2_x1 - dndydx2_x1)))
+def dy2_trial(x,y,n_outXY_y,n_outXY_yy):
+    """
+    f_yy = x(1-x)[2N_{y} + y * N_{yy}]
+    """
+    return (x * (1-x) * (2 * n_outXY_y + y * n_outXY_yy))
 
-    def dy_trial(self,x,y, n_xy, n_x1, dndy_x1, dndy):
-        """
-        df / dy = 2sin(pi*x) + x(1-x)[(N - N(x,1) - N_{y}(x,1))
-                                    + y * N_{y}]
-        """
-        return (2*torch.sin(np.pi *x) + x*(1-x) *
-            ((n_xy - n_x1 - dndy_x1) + (y* dndy)))
+def diffEq(x,y,trial_dx2,trial_dy2):
+    RHS = (2-((np.pi*y)**2)) * torch.sin(np.pi * x)
+    return trial_dx2 + trial_dy2 - RHS
 
-    def dy2_trial(self,x,y,dndy,dndy2):
-        """
-        d^2f / dy^2 = x(1-x)[2N_{y} + y * N_{yy}]
-        """
-        return (x * (1-x) * (2 * dndy + y * dndy2))
-
-    def diffEq(self,x,y,trial_dx2,trial_dy2):
-        RHS = (2-((np.pi*y)**2)) * torch.sin(np.pi * x)
-        return trial_dx2 + trial_dy2 - RHS
+def solution(x, y):
+    return (y**2) * torch.sin(np.pi * x)
 
 
-def train(network, loader, loss_fn, optimiser, diffEq, epochs, iterations):
+def train(network, loader, lossFn, optimiser,numEpochs):
     """Trains the neural network"""
     cost_list=[]
     network.train(True)
-    for epoch in range(epochs+1):
+    for _ in range(numEpochs):
         for batch in loader:
-            x, y = batch[:,0].view(-1,1), batch[:,1].view(-1,1)
-            y1 = torch.ones_like(y)
-
+            x, y = torch.split(batch,1, dim=1)
+            y_ones = torch.ones_like(y)
             # Coordinates (x,1) for all x in batch
-            xy1 = torch.cat((x,y1),1)
+            x1 = torch.cat((x,y_ones),1)
 
             # Neural network output at (x,y)
-            n_xy = network(batch).view(-1,1)
-            
+            n_outXY = network(batch)
             # Neural network output at (x,1)
-            n_x1 = network(xy1).view(-1,1)
+            n_outX1 = network(x1)
 
             # Get all required derivatives of n(x,y)
+            dn = grad(n_outXY, batch, torch.ones_like(n_outXY), retain_graph=True, create_graph=True)[0]
+            # n_x , n_y
+            n_outXY_x, n_outXY_y = dn[:,0].view(-1,1), dn[:,1].view(-1,1)
+            dn2 = grad(dn, batch, torch.ones_like(dn), retain_graph=True, create_graph=True)[0]
+            # n_xx , n_yy
+            n_outXY_xx, n_outXY_yy = torch.split(dn2 , 1, dim = 1 )
 
-            dn = torch.autograd.grad(n_xy, batch, torch.ones_like(n_xy), retain_graph=True, create_graph=True)[0]
-            # dn/dx , dn/dy
-            dndx, dndy = dn[:,0].view(-1,1), dn[:,1].view(-1,1)
+            # Get all required derivatives of n(x,1):
+            dn_x1 = grad(n_outX1, x1, torch.ones_like(n_outX1), retain_graph=True, create_graph=True)[0]
+            # n_x |(y=1) , n_y |(y=1)
+            n_outX1_x, n_outX1_y = torch.split(dn_x1 , 1, dim = 1 )
 
-            dn2 = torch.autograd.grad(dn, batch, torch.ones_like(dn), retain_graph=True, create_graph=True)[0]
-            # d^2 n / dx^2 , d^2 n / dy^2
-            dndx2, dndy2 = torch.split(dn2 , 1, dim = 1 )
+            dn2dx_x1 = grad(n_outX1_x, x1, torch.ones_like(n_outX1_x), retain_graph = True, create_graph = True)[0]
+            # n_xx |(y=1)
+            n_outX1_xx , _= torch.split(dn2dx_x1, 1, dim = 1)
 
-            # Get all required derivatives of n(x,1)
+            dn2dy_x1 = grad(n_outX1_y, x1, torch.ones_like(n_outX1_y), retain_graph = True, create_graph = True)[0]
+            # n_xy |(y=1)
+            n_outX1_xy , _ = torch.split(dn2dy_x1, 1, dim=1)
 
-            dn_x1 = torch.autograd.grad(n_x1, xy1, torch.ones_like(n_x1), retain_graph=True, create_graph=True)[0]
-            # dn / dx |(y=1) , dn/dy |(y=1)
-            dndx_x1, dndy_x1 = torch.split(dn_x1 , 1, dim = 1 )
-
-            dn2dx_x1 = torch.autograd.grad(dndx_x1, xy1, torch.ones_like(dndx_x1), retain_graph = True, create_graph = True)[0]
-            # d^2n / dx^2 |(y=1)
-            dndx2_x1 , _= torch.split(dn2dx_x1, 1, dim = 1)
-
-            dn2dy_x1 = torch.autograd.grad(dndy_x1, xy1, torch.ones_like(dndy_x1), retain_graph = True, create_graph = True)[0]
-            # d/dx (dn/dy |(y=1))
-            dndydx_x1 , _ = torch.split(dn2dy_x1, 1, dim=1)
-
-            dn3dy_x1 = torch.autograd.grad(dndydx_x1, xy1, torch.ones_like(dndydx_x1), retain_graph = True, create_graph = True)[0]
-            # d^2/dx^2 (dn/dy |(y=1))
-            dndydx2_x1 ,  _= torch.split(dn3dy_x1, 1, dim=1)
+            dn3dy_x1 = grad(n_outX1_xy, x1, torch.ones_like(n_outX1_xy), retain_graph = True, create_graph = True)[0]
+            # n_xxy |(y=1)
+            n_outX1_xxy ,  _= torch.split(dn3dy_x1, 1, dim=1)
             
             # Get second derivatives of trial solution
-            trial_dx2 = diffEq.dx2_trial(x,y,n_xy, n_x1, dndy_x1, dndx, dndx_x1, dndydx_x1, dndx2, dndx2_x1, dndydx2_x1)
-            trial_dy2 = diffEq.dy2_trial(x,y,dndy,dndy2)
+            trial_dx2 = dx2_trial(x,y,n_outXY, n_outX1, n_outX1_y, n_outXY_x, n_outX1_x, n_outX1_xy, n_outXY_xx, n_outX1_xx, n_outX1_xxy)
+            trial_dy2 = dy2_trial(x,y,n_outXY_y,n_outXY_yy)
             
             # Calculate LHS of differential equation D(x,y) = 0
-            D = diffEq.diffEq(x,y,trial_dx2,trial_dy2)
+            D = diffEq(x,y,trial_dx2,trial_dy2)
 
-            # Calculate and store loss
-            loss = loss_fn(D, torch.zeros_like(D))
-            
+            # calculate cost
+            cost = lossFn(D, torch.zeros_like(D))
+        
             # Optimization algorithm
-            loss.backward()
-            optimiser.step()
-            optimiser.zero_grad()
+            cost.backward() # perform backpropagation
+            optimiser.step() # perform parameter optimisation
+            optimiser.zero_grad() # reset gradients to zero
 
-        # if epoch%(epochs/5)==0:
-        if epoch == epochs:
-            plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange)
-        cost_list.append(loss.detach().numpy())
+        cost_list.append(cost.item()) # store final cost of every epoch
 
     network.train(False)
     return cost_list
 
 
-def plotNetwork(network, diffEq, epoch, epochs, iterations, xrange, yrange):
+def plotNetwork(network, epoch, samplingMethod):
     """
     Plots the outputs of both neural networks, along with the
     analytic solution in the same range
     """
-    x_lin  = torch.linspace(xrange[0],xrange[1],num_samples, requires_grad=True)
-    y_lin  = torch.linspace(yrange[0],yrange[1],num_samples, requires_grad=True)
+    batch = UniformDataSet(xRange,yRange,numSamples).data_in
+    x, y = torch.split(batch,1, dim=1)
+    y_ones = torch.ones_like(y)
+    # Coordinates (x,1) for all x in batch
+    x1 = torch.cat((x,y_ones),1)
+
+    # Neural network output at (x,y)
+    n_outXY = network(batch)
+    # Neural network output at (x,1)
+    n_outX1 = network(x1)
+
+    # Get all required derivatives of n(x,y)
+    dn = grad(n_outXY, batch, torch.ones_like(n_outXY), retain_graph=True, create_graph=True)[0]
+    # n_x , n_y
+    n_outXY_x, n_outXY_y = dn[:,0].view(-1,1), dn[:,1].view(-1,1)
+    dn2 = grad(dn, batch, torch.ones_like(dn), retain_graph=True, create_graph=True)[0]
+    # n_xx , n_yy
+    n_outXY_xx, n_outXY_yy = torch.split(dn2 , 1, dim = 1 )
+
+    # Get all required derivatives of n(x,1):
+    dn_x1 = grad(n_outX1, x1, torch.ones_like(n_outX1), retain_graph=True, create_graph=True)[0]
+    # n_x |(y=1) , n_y |(y=1)
+    n_outX1_x, n_outX1_y = torch.split(dn_x1 , 1, dim = 1 )
+
+    dn2dx_x1 = grad(n_outX1_x, x1, torch.ones_like(n_outX1_x), retain_graph = True, create_graph = True)[0]
+    # n_xx |(y=1)
+    n_outX1_xx , _= torch.split(dn2dx_x1, 1, dim = 1)
+
+    dn2dy_x1 = grad(n_outX1_y, x1, torch.ones_like(n_outX1_y), retain_graph = True, create_graph = True)[0]
+    # n_xy |(y=1)
+    n_outX1_xy , _ = torch.split(dn2dy_x1, 1, dim=1)
+
+    dn3dy_x1 = grad(n_outX1_xy, x1, torch.ones_like(n_outX1_xy), retain_graph = True, create_graph = True)[0]
+    # n_xxy |(y=1)
+    n_outX1_xxy ,  _= torch.split(dn3dy_x1, 1, dim=1)
+    
+    # Get second derivatives of trial solution
+    trial_dx2 = dx2_trial(x,y,n_outXY, n_outX1, n_outX1_y, n_outXY_x, n_outX1_x, n_outX1_xy, n_outXY_xx, n_outX1_xx, n_outX1_xxy)
+    trial_dy2 = dy2_trial(x,y,n_outXY_y,n_outXY_yy)
+    
+    # Calculate LHS of differential equation D(x,y) = 0
+    D = diffEq(x,y,trial_dx2,trial_dy2)
+
+    # calculate cost
+    cost = lossFn(D, torch.zeros_like(D))
+    print("test cost = ", cost.item())
+
+    # Get trial solution
+    trialSolution = trial(x,y,n_outXY,n_outX1,n_outX1_y)
+
+    # Get exact solution
+    exact = solution(x,y).detach().numpy()
+
+    # Calculate residual error
+    trialSolution = trialSolution.detach().numpy()
+    surfaceLoss = ((trialSolution-exact)**2).mean()
+    print("trial-solution error = ", surfaceLoss)
+
+    # PLOT SURFACE
+
+    x_lin  = torch.linspace(xRange[0],xRange[1],numSamples, requires_grad=True)
+    y_lin  = torch.linspace(yRange[0],yRange[1],numSamples, requires_grad=True)
     X,Y = torch.meshgrid(x_lin,y_lin)
     x, y  = X.reshape(-1,1), Y.reshape(-1,1)
 
     # Get network output at (x,y)
     xy = torch.cat((x,y),1)
-    n_xy = network.forward(xy).view(-1,1)
+    y_ones = torch.ones_like(y)
+    # Coordinates (x,1) for all x in batch
+    x1 = torch.cat((x,y_ones),1)
 
-    # Get network output at (x,1)
-    y1 = torch.ones_like(y)
-    xy1 = torch.cat((x,y1),1)
-    n_x1 = network(xy1).view(-1,1)
+    # Neural network output at (x,y)
+    n_outXY = network(xy)
+    # Neural network output at (x,1)
+    n_outX1 = network(x1)
 
-    # Calculate derivatives of n(x,1)
-    dn_x1 = torch.autograd.grad(n_x1, xy1, torch.ones_like(n_x1), retain_graph=True, create_graph=True)[0]
-    _ , dndy_x1 = torch.split(dn_x1, 1, dim =1)
+    # Get all required derivatives of n(x,1):
+    dn_x1 = grad(n_outX1, x1, torch.ones_like(n_outX1), retain_graph=True, create_graph=True)[0]
+    # n_x |(y=1) , n_y |(y=1)
+    n_outX1_x, n_outX1_y = torch.split(dn_x1 , 1, dim = 1 )
 
     # Get trial solution
-    trial = diffEq.trial(x,y,n_xy,n_x1,dndy_x1)
-
+    trialSolution = trial(x,y,n_outXY,n_outX1,n_outX1_y)
     # Get exact solution
-    exact = diffEq.solution(x,y).detach().numpy()
-
-    # Calculate residual error
-    trial = trial.detach().numpy()
-    surfaceLoss = ((trial-exact)**2).mean()
-    print("mean square difference between trial and exact solution = ", surfaceLoss)
-
-    trial = trial.reshape(num_samples,num_samples)
+    exact = solution(x,y).detach().numpy()
+    trialSolution = trialSolution.reshape(numSamples,numSamples).detach().numpy()
 
     # Plot trial and exact solutions
     X = X.detach().numpy()
     Y = Y.detach().numpy()
     ax = plt.axes(projection='3d')
-    ax.plot_surface(X,Y,trial,rstride=1, cstride=1,
+    ax.plot_surface(X,Y,trialSolution,rstride=1, cstride=1,
                 cmap='plasma', edgecolor='none')
     ax.scatter(X,Y,exact, label = 'Exact Solution')
     ax.set_xlabel('x')
     ax.set_ylabel('y')
     ax.set_zlabel('z')
-    ax.legend()
-    ax.set_title(str(epoch + iterations*epochs) + " Epochs")
+    ax.legend(fontsize = 16)
+    ax.set_title("Sampling Method: " + samplingMethod + ", " + str(epoch) + " Epochs" , fontsize = 16)
     plt.show()
 
     return surfaceLoss
 
+numSamples  = 10
+xRange      = [0,1]
+yRange      = [0,1]
+numEpochs   = 1000
+totalEpochs = 5000
+networkDict = {}
 
-num_samples = 10
-xrange = [0,1]
-yrange = [0,1]
+datasetDict = {"Uniform" : UniformDataSet(xRange,yRange,numSamples), 
+               "Lattice" : LinearDataSet(xRange,yRange,numSamples)}
 
-epochs = 10000
-# lrs = [(7e-3 + i * 1e-4) for i in range(11)]
-# lrs = [(4e-3 + i * 5e-4) for i in range(1,11)]
-# lrs = [1e-3]
+for samplingMethod in datasetDict:
+    networkDict = {}
+    trainData = datasetDict[samplingMethod]
+    try: # load saved network if possible
+        checkpoint = torch.load('problem7InitialNetwork.pth')
+        network    = checkpoint['network']
+    except: # create new network
+        network    = PDESolver(numHiddenNodes=16)
+        checkpoint = {'network': network}
+        torch.save(checkpoint, 'problem7InitialNetwork.pth')
 
-# lrs = [(i * 1e-3) for i in range(1,11)]
-lrs = [(i * 1e-4) for i in range(1,11)]
-finalLosses = []
-surfaceLosses = []
-for lr in lrs:
-    losses = [1]
-    iterations = 0
-    network     = Fitter(num_hidden_nodes=10)
-    loss_fn      = torch.nn.MSELoss()
-    optimiser  = torch.optim.Adam(network.parameters(), lr = lr)
-    train_set    = DataSet(xrange,yrange,num_samples)
-    train_loader = torch.utils.data.DataLoader(dataset=train_set, batch_size=100, shuffle=True)
-    diffEq = DiffEq(xrange, yrange, num_samples)
-    while losses[-1] > 0.001  and iterations < 2:
-        newLoss = train(network, train_loader, loss_fn,
-                            optimiser, diffEq, epochs, iterations)
-        losses.extend(newLoss)
-        iterations += 1
-    losses = losses[1:]
-    finalLoss = losses[-1]
-    finalLosses.append(finalLoss)
-    print("lr = ", lr)
-    print(f"{iterations*epochs} epochs total, final loss = {losses[-1]}")
+    lossFn      = torch.nn.MSELoss()
+    optimiser   = torch.optim.Adam(network.parameters(), lr = 1e-3)
+    trainLoader = torch.utils.data.DataLoader(dataset=trainData, batch_size=int(numSamples**2), shuffle=True)
 
-    surfaceLoss = plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
-    surfaceLosses.append(surfaceLoss)
+    epoch = 0 
+    costList = []
 
-    plt.semilogy(losses)
-    plt.xlabel("Epochs")
-    plt.ylabel("Log of Loss")
-    plt.title("Loss")
+    while epoch < totalEpochs:
+        costList.extend(train(network, trainLoader, lossFn, optimiser, numEpochs))
+        epoch += numEpochs
+    
+    print(f"{epoch} epochs total, final cost = {costList[-1]}")
+
+    plt.semilogy(costList)
+    plt.xlabel("Epochs", fontsize = 16)
+    plt.ylabel("Cost", fontsize = 16)
+    plt.title(f"Training Costs, Sampling Method = {samplingMethod}", fontsize = 16)
     plt.show()
 
-plotNetwork(network, diffEq, 0, epochs, iterations, [0,1], [0,1])
-
-plt.semilogy(lrs,surfaceLosses)
-plt.xlabel("Learning Rate")
-plt.ylabel("Mean Squared Error ")
-plt.title("Mean Squared Error of Network from Exact Solution")
-plt.show()
-
-plt.semilogy(lrs,finalLosses)
-plt.xlabel("Learning Rate")
-plt.ylabel("Final Loss")
-plt.title("Effect of Learning Rate on Final Loss")
-plt.show()
+    plotNetwork(network, epoch, samplingMethod)
+    
+    networkDict["costList"] = costList
+    networkDict["network"] = network
+    networkDict["dataSet"] = trainData
+    torch.save(networkDict, 'problem7' + samplingMethod + '.pth')
 #%%
