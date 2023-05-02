@@ -1,0 +1,29 @@
+Notes
+
+Scope of project:
+Not something totally new, but adjacent
+E.g. play around with boundary conditions / parameters in existing examples
+
+3 body problem, using a GPU:
+Curriculumn learning setting end of subinterval as new ICs
+KP will ask about it
+
+Parameter inference
+
+Investigate complexity? Asymptotic complexity or actual:
+See what PyTorch can tell you w.r.t. memory and work
+Otherwise go for asymptotic complexity and investigate this changes
+as parts of the problem change (e.g. with new BCs, longer time interval)
+
+Investigate "shooting" methods
+
+Solution bundles, complexity and parameter inference would be A LOT 
+
+
+
+Poster:
+Need to explain ML basics but only those strictly required 
+
+Presentation:
+Maybe coordinate with others to explain different parts
+But not strictly required, so make own presentation self-contained
