@@ -1,5 +1,0 @@
-Investigate parameter estimation
-Solution bundles on GPU?
-
-Poster
-Presentation
