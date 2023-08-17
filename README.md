@@ -29,22 +29,32 @@ We explain why neural networks are suited to the task of function approximation,
 ### Chapter 4: Optimisation Algorithms
 
 In chapter 2 the basic batch gradient descent algorithm for training a neural network was explained. Here, we explore in detail a variety of gradient-based optimisation algorithms designed to perform better than batch gradient descent, and compare their strengths and limitations. 
->![momentum](/Graphs/momentum.png "The effect of momentum")  
-> Smoothing effect of momentum on gradient descent. Movement is dampened along parameter axes
-where gradients fluctuate more, while progress is unchanged for parameters with more constant gradients (taken
-from [towardsdatascience.com/gradient-descent](https://towardsdatascience.com/gradient-descent-explained-9b953fc0d2c)).
+> <img src="Graphs/momentum.png" alt="momentum" width="650"/> <br>
+> Smoothing effect of momentum on gradient descent. Movement is dampened along parameter axes where gradients fluctuate more, while progress is unchanged for parameters with more constant gradients (image taken from <a href="https://towardsdatascience.com/gradient-descent-explained-9b953fc0d2c">towardsdatascience.com/gradient-descent</a>).
 
 ### Chapter 5: Application to Differential Equations
 
 We outline the Lagaris method for solving differential equations using neural networks, which differs greatly from traditional (finite-difference) approaches for solving differential equations numerically. We then apply this to a few different examples (ODEs of various orders, systems of ODEs, linear and non-linear PDEs) to illustrate its efficacy and stumbling blocks. Simultaneously, we test the effect of varying the aspects of our training methodology discussed in chapters 2 and 4, and encounter an effective method known as curriculum learning. The code corresponding to these examples can be found in the **LagarisProblems** folder.
+> <img src="Graphs/optimAdam.png" alt="Adam" width="445"/> <img src="Graphs/optimCosts.png" alt="costs" width="455"/> <br>
+> Left: Output of a neural network trained with Adam optimisation algorithm to solve example 2 from the Lagaris paper for 20,000 epochs, compared to the true solution.
+> 
+> Right: Training cost values for five different optimisation algorithms to solve example 2 from the Lagaris paper for 20,000 epochs. The graph’s key is ordered from highest final cost to lowest.
 
 ### Chapter 6: Solution Bundles
 
 We consider a powerful extension of the Lagaris method, proposed in 2020, in which a neural network is trained to approximate the solution of a given differential equation on a *range of initial conditions*. We see the alterations this necessitates in our method, including the use of a GPU, and use a restricted version of the famous three-body problem to illustrate the method. We compare various modes of curriculum learning and observe its limitations. Finally, we give an overview of how this extended version of the Lagaris method compares to traditional finite-difference methods. The **ThreeBodyProblem** folder contains code for this chapter. 
+> <img src="Graphs/3body.png" alt="3body" width="450"/> <img src="Graphs/3bodyCost.png" alt="costs" width="450"/> <br>
+> Left: Output of neural network trained to solve the planar circular restricted three-body problem on a bundle of initial conditions, compared to the 4th-order Runge-Kutta solution. The Earth and the moon are shown in blue and orange.
+>
+> Right: Training cost values of this network, trained on 3,000,000 batches of 10,000 inputs. The use of a learning rate scheduler during training leads to the sequence of "steps" observed in the cost graph.
 
 ### Chapter 7: Parameter Inference
 
 A different application of neural networks to the field of differential equations (developed in 2017) is explored, in which unknown parameters in a differential equation can be estimated based on sample data values of the solution function. We use an example from fluid mechanics, Burger's equation, to demonstrate the method and compare some variations of its implementation. Code for this chapter can be found in the **burgersEquation** folder. 
+> <img src="Graphs/burgersEquationOriginalMethod.png" alt="burgersApproximation" width="405"/> <img src="Graphs/burgersEquationParameterValues.png" alt="burgersParameters" width="495"/> <br>
+> Left: Output of a neural network trained to approximate the solution to Burger’s equation for 100,000 epochs.
+>
+> Right: Neural network’s estimation of Burger’s equation parameter values λ and ν throughout training.
 
 ### Chapter 8: Conclusion
 
