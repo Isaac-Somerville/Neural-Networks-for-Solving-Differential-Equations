@@ -1,6 +1,8 @@
 # Neural Networks for Solving Differential Equations
 
-## An exploration into artificial neural networks and how they can be applied to the study of differential equations.
+An exploration into artificial neural networks and how they can be applied to the study of differential equations.
+
+## Project Overview
 
 This project was undertaken as a dissertation for a Master's programme in Mathematics at Durham University, where it attained a final grade of 85%. The report will be comprehensible for anyone with a solid grounding in undergraduate maths and Python programming; no prior knowledge of neural networks, PyTorch or numerical solutions to differential equations are required. An overview of the report structure is given below.
 
@@ -36,15 +38,34 @@ We consider a powerful extension of the Lagaris method, proposed in 2020, in whi
 
 A different application of neural networks to the field of differential equations (developed in 2017) is explored, in which unknown parameters in a differential equation can be estimated based on sample data values of the solution function. We use an example from fluid mechanics, Burger's equation, to demonstrate the method and compare some variations of its implementation. Code for this chapter can be found in the **burgersEquation** folder. 
 
+### Chapter 8: Conclusion
+
+We conclude with a discussion of the scope of this paper, and indications for areas of future development which we have not explored.
+
+### Appendix A: Xavier Weight Initialisation
+
+We give a detailed explanation of the mathematics underlying a popular weight-initialisation method described in chapter 2: Xavier initialisation.
+
+### Appendix B: Finite-Difference Methods
+
+We give a brief summary of the two finite-difference methods for solving ordinary differential equations mentioned in this paper: the Euler method and the fourth-order Runge-Kutta method.
+
+### Appendix C: Code Samples
+
+Samples of the most relevant code referenced in the paper are included here.
+
+### Bibliography
+
+All sources used are cited here. See below for the references I found most important and useful.
+
+## Packages Used
+* PyTorch Version 1.12.1
+* NumPy Version 1.23.5
+* 
 Moshe Leshno et al. “Multilayer feedforward networks with a nonpolynomial activation function can approximate any function”. In: Neural Networks 6.6 (1993), pp. 861–867. issn: 0893-6080. doi: https://doi.org/10.1016/S0893-6080(05)80131-5. url: https://www.sciencedirect.com/science/article/pii/S0893608005801315.
 
-I.E. Lagaris, A. Likas, and D.I. Fotiadis. “Artificial neural networks for solving ordinary and
-partial differential equations”. In: IEEE Transactions on Neural Networks 9.5 (1998), pp. 987–
-1000. doi: 10.1109/72.712178. url: https://arxiv.org/abs/physics/9705023.
+I.E. Lagaris, A. Likas, and D.I. Fotiadis. “Artificial neural networks for solving ordinary and partial differential equations”. In: IEEE Transactions on Neural Networks 9.5 (1998), pp. 987– 1000. doi: 10.1109/72.712178. url: https://arxiv.org/abs/physics/9705023.
 
-Cedric Flamant, Pavlos Protopapas, and David Sondak. “Solving Differential Equations Using
-Neural Network Solution Bundles”. In: CoRR abs/2006.14372 (2020). arXiv: 2006 . 14372.
-url: https://arxiv.org/abs/2006.14372.
+Cedric Flamant, Pavlos Protopapas, and David Sondak. “Solving Differential Equations Using Neural Network Solution Bundles”. In: CoRR abs/2006.14372 (2020). arXiv: 2006 . 14372. url: https://arxiv.org/abs/2006.14372.
 
-Maziar Raissi, Paris Perdikaris, and George E. Karniadakis. “Physics Informed Deep Learning (Part II): Data-driven Discovery of Nonlinear Partial Differential Equations”. In: CoRR
-abs/1711.10566 (2017). arXiv: 1711.10566. url: http://arxiv.org/abs/1711.10566.
+Maziar Raissi, Paris Perdikaris, and George E. Karniadakis. “Physics Informed Deep Learning (Part II): Data-driven Discovery of Nonlinear Partial Differential Equations”. In: CoRR abs/1711.10566 (2017). arXiv: 1711.10566. url: http://arxiv.org/abs/1711.10566.
