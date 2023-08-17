@@ -29,7 +29,7 @@ We explain why neural networks are suited to the task of function approximation,
 ### Chapter 4: Optimisation Algorithms
 
 In chapter 2 the basic batch gradient descent algorithm for training a neural network was explained. Here, we explore in detail a variety of gradient-based optimisation algorithms designed to perform better than batch gradient descent, and compare their strengths and limitations. 
-> <img src="Graphs/momentum.png" alt="momentum" width="650"/> <br>
+> <img src="Graphs/momentum.png" alt="momentum" width="575"/> <br>
 > Smoothing effect of momentum on gradient descent. Movement is dampened along parameter axes where gradients fluctuate more, while progress is unchanged for parameters with more constant gradients (image taken from <a href="https://towardsdatascience.com/gradient-descent-explained-9b953fc0d2c">towardsdatascience.com/gradient-descent</a>).
 
 ### Chapter 5: Application to Differential Equations
