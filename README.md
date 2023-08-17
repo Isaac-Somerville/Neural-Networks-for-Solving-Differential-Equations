@@ -35,7 +35,7 @@ In chapter 2 the basic batch gradient descent algorithm for training a neural ne
 ### Chapter 5: Application to Differential Equations
 
 We outline the Lagaris method for solving differential equations using neural networks, which differs greatly from traditional (finite-difference) approaches for solving differential equations numerically. We then apply this to a few different examples (ODEs of various orders, systems of ODEs, linear and non-linear PDEs) to illustrate its efficacy and stumbling blocks. Simultaneously, we test the effect of varying the aspects of our training methodology discussed in chapters 2 and 4, and encounter an effective method known as curriculum learning. The code corresponding to these examples can be found in the **LagarisProblems** folder.
-> <img src="Graphs/optimAdam.png" alt="Adam" width="445"/> <img src="Graphs/optimCosts.png" alt="costs" width="455"/> <br>
+> <img src="Graphs/optimAdam.png" alt="Adam" width="386"/> <img src="Graphs/optimCosts.png" alt="costs" width="394"/> <br>
 > Left: Output of a neural network trained with Adam optimisation algorithm to solve example 2 from the Lagaris paper for 20,000 epochs, compared to the true solution.
 > 
 > Right: Training cost values for five different optimisation algorithms to solve example 2 from the Lagaris paper for 20,000 epochs. The graph’s key is ordered from highest final cost to lowest.
@@ -51,7 +51,7 @@ We consider a powerful extension of the Lagaris method, proposed in 2020, in whi
 ### Chapter 7: Parameter Inference
 
 A different application of neural networks to the field of differential equations (developed in 2017) is explored, in which unknown parameters in a differential equation can be estimated based on sample data values of the solution function. We use an example from fluid mechanics, Burger's equation, to demonstrate the method and compare some variations of its implementation. Code for this chapter can be found in the **burgersEquation** folder. 
-> <img src="Graphs/burgersEquationOriginalMethod.png" alt="burgersApproximation" width="405"/> <img src="Graphs/burgersEquationParameterValues.png" alt="burgersParameters" width="495"/> <br>
+> <img src="Graphs/burgersEquationOriginalMethod.png" alt="burgersApproximation" width="351"/> <img src="Graphs/burgersEquationParameterValues.png" alt="burgersParameters" width="429"/> <br>
 > Left: Output of a neural network trained to approximate the solution to Burger’s equation for 100,000 epochs.
 >
 > Right: Neural network’s estimation of Burger’s equation parameter values λ and ν throughout training.
