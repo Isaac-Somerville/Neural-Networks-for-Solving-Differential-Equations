@@ -4,7 +4,7 @@ An exploration into artificial neural networks and how they can be applied to th
 
 ## Project Overview
 
-This project was undertaken as a dissertation for a Master's programme in Mathematics at Durham University, where it attained a final grade of 85%. The report will be comprehensible for anyone with a solid grounding in undergraduate maths and Python programming; no prior knowledge of neural networks, PyTorch or numerical solutions to differential equations are required. An overview of the report structure is given below.
+This project was undertaken as a dissertation for a Master's programme in Mathematics at Durham University (Oct. 2022 - Apr. 2023), where it attained a final grade of 85%. The report will be comprehensible for anyone with a solid grounding in undergraduate maths and Python programming; no prior knowledge of neural networks, PyTorch or numerical solutions to differential equations are required. An overview of the report structure is given below.
 
 ### Abstract
 
