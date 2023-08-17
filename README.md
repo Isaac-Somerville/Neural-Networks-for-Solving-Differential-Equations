@@ -6,13 +6,7 @@ This project was undertaken as a dissertation for a Master's programme in Mathem
 
 ### Abstract
 
-Finding numerical solutions to differential equations is crucial to many scientific disciplines. In
-the 1990s, a new method was proposed which utilises neural networks to approximate the solution
-function of a differential equation. In this dissertation, we explore the efficacy of this method
-in a variety of different examples. We also examine the effect of varying different aspects of our
-neural network’s structure and training methodology. Finally, we consider a recent extension of
-the original method, and another technique by which neural networks can be used to estimate
-unknown parameters in a differential equation.
+Finding numerical solutions to differential equations is crucial to many scientific disciplines. In the 1990s, a new method was proposed which utilises neural networks to approximate the solution function of a differential equation. In this dissertation, we explore the efficacy of this method in a variety of different examples. We also examine the effect of varying different aspects of our neural network’s structure and training methodology. Finally, we consider a recent extension of the original method, and another technique by which neural networks can be used to estimate unknown parameters in a differential equation.
 
 ### Chapter 1: Introduction
 
@@ -20,16 +14,11 @@ We give a brief summary of the histories of both ANNs and differential equations
 
 ### Chapter 2: Neural Networks
 
-We begin by understanding some basic notions in the study of neural networks, with our desired
-applications in mind. We see the fundamental components that make up a neural network,
-and a common method of training them. Then, we explore automatic differentiation, the
-computational technique behind a crucial part of their training. 
+We begin by understanding some basic notions in the study of neural networks, with our desired applications in mind. We see the fundamental components that make up a neural network, and a common method of training them. Then, we explore automatic differentiation, the computational technique behind a crucial part of their training: the backpropagation algorithm. 
 
 ### Chapter 3: Function Approximation
 
-We explain why neural networks are suited to the task of function approximation, and then give
-an introduction to PyTorch, the machine learning library used throughout this project. We then
-demonstrate a basic example of using a neural network in PyTorch to approximate sin(x).
+We explain why neural networks are suited to the task of function approximation, and then givean introduction to PyTorch, the machine learning library used throughout this project. We then demonstrate a basic example of using a neural network in PyTorch to approximate sin(x).
 
 ### Chapter 4: Optimisation Algorithms
 
@@ -37,8 +26,15 @@ In chapter 2 the basic batch gradient descent algorithm for training a neural ne
 
 ### Chapter 5: Application to Differential Equations
 
-We outline the Lagaris method for solving differential equations using neural networks, which
-differs greatly from traditional approaches for solving differential equations numerically. We then apply this to a few different examples (ODEs of various orders, systems of ODEs, linear and non-linear PDEs) to illustrate its efficacy. We also take this opportunity to test the effect of varying the aspects of our training methodology discussed in chapters 2 and 4.
+We outline the Lagaris method for solving differential equations using neural networks, which differs greatly from traditional (finite-difference) approaches for solving differential equations numerically. We then apply this to a few different examples (ODEs of various orders, systems of ODEs, linear and non-linear PDEs) to illustrate its efficacy and stumbling blocks. Simultaneously, we test the effect of varying the aspects of our training methodology discussed in chapters 2 and 4, and encounter a powerful method known as curriculum learning. The code corresponding to these examples can be found in the **LagarisProblems** folder.
+
+### Chapter 6: Solution Bundles
+
+We consider a powerful extension of the Lagaris method, proposed in 2020, in which a neural network is trained to approximate the solution of a given differential equation on a *range of initial conditions*. We see the alterations this necessitates in our method, including the use of a GPU, and use a restricted version of the famous three-body problem to illustrate the method. We compare various modes of curriculum learning and observe its limitations. Finally, we give an overview of how this extended version of the Lagaris method compares to traditional finite-difference methods. The **ThreeBodyProblem** folder contains code for this chapter. 
+
+### Chapter 7: Parameter Inference
+
+A different application of neural networks to the field of differential equations (developed in 2017) is explored, in which unknown parameters in a differential equation can be estimated based on sample data values of the solution function. We use an example from fluid mechanics, Burger's equation, to demonstrate the method and compare some variations of its implementation. Code for this chapter can be found in the **burgersEquation** folder. 
 
 Moshe Leshno et al. “Multilayer feedforward networks with a nonpolynomial activation function can approximate any function”. In: Neural Networks 6.6 (1993), pp. 861–867. issn: 0893-6080. doi: https://doi.org/10.1016/S0893-6080(05)80131-5. url: https://www.sciencedirect.com/science/article/pii/S0893608005801315.
 
