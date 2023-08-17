@@ -61,11 +61,30 @@ All sources used are cited here. See below for the references I found most impor
 ## Packages Used
 * PyTorch Version 1.12.1
 * NumPy Version 1.23.5
-* 
+* Matplotlib Version 3.6.0
+* SciPy Version 1.9.1
+
+## Key Sources
+
+### Neural Networks:
+Michael A. Nielsen. Neural Networks and Deep Learning. Determination Press, 2018. url: http://neuralnetworksanddeeplearning.com.
+
+Ian Goodfellow, Yoshua Bengio, and Aaron Courville. Deep Learning. MIT Press, 2016. url: http://www.deeplearningbook.org.
+
+### Automatic Differentiation:
+Atilim Gunes Baydin, Barak A. Pearlmutter, and Alexey Andreyevich Radul. “Automaticdifferentiation in machine learning: a survey”. In: CoRR abs/1502.05767 (2015). arXiv:1502.05767. url: http://arxiv.org/abs/1502.05767.
+
+### The Universal Approximation Theorem:
 Moshe Leshno et al. “Multilayer feedforward networks with a nonpolynomial activation function can approximate any function”. In: Neural Networks 6.6 (1993), pp. 861–867. issn: 0893-6080. doi: https://doi.org/10.1016/S0893-6080(05)80131-5. url: https://www.sciencedirect.com/science/article/pii/S0893608005801315.
 
+### The Lagaris Method:
 I.E. Lagaris, A. Likas, and D.I. Fotiadis. “Artificial neural networks for solving ordinary and partial differential equations”. In: IEEE Transactions on Neural Networks 9.5 (1998), pp. 987– 1000. doi: 10.1109/72.712178. url: https://arxiv.org/abs/physics/9705023.
 
+### Curriculum Learning:
+Guy Hacohen and Daphna Weinshall. “On the power of curriculum learning in training deep networks”. In: International Conference on Machine Learning (2019), pp. 2535–2544.
+
+### Solution Bundles:
 Cedric Flamant, Pavlos Protopapas, and David Sondak. “Solving Differential Equations Using Neural Network Solution Bundles”. In: CoRR abs/2006.14372 (2020). arXiv: 2006 . 14372. url: https://arxiv.org/abs/2006.14372.
 
+### Parameter Inference:
 Maziar Raissi, Paris Perdikaris, and George E. Karniadakis. “Physics Informed Deep Learning (Part II): Data-driven Discovery of Nonlinear Partial Differential Equations”. In: CoRR abs/1711.10566 (2017). arXiv: 1711.10566. url: http://arxiv.org/abs/1711.10566.
