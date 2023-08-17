@@ -12,7 +12,7 @@ Finding numerical solutions to differential equations is crucial to many scienti
 
 ### Chapter 1: Introduction
 
-We give a brief summary of the histories of both ANNs and differential equations, and a hint at how the two were combined by the Lagaris method in the 1990s. We then outline the structure of the rest of the report.
+We give a brief summary of the histories of both artificial neural networks and differential equations, and a hint at how the two were combined by the Lagaris method in the 1990s. We then outline the structure of the rest of the report.
 
 ### Chapter 2: Neural Networks
 
@@ -20,15 +20,15 @@ We begin by understanding some basic notions in the study of neural networks, wi
 
 ### Chapter 3: Function Approximation
 
-We explain why neural networks are suited to the task of function approximation, and then givean introduction to PyTorch, the machine learning library used throughout this project. We then demonstrate a basic example of using a neural network in PyTorch to approximate sin(x).
+We explain why neural networks are suited to the task of function approximation, and then give an introduction to PyTorch, the machine learning library used throughout this project. We demonstrate a basic example of using a neural network in PyTorch to approximate sin(x).
 
 ### Chapter 4: Optimisation Algorithms
 
-In chapter 2 the basic batch gradient descent algorithm for training a neural network was explained. Here, we explore in detail a variety of gradient-based optimisation algorithms and compare their strengths and limitations. 
+In chapter 2 the basic batch gradient descent algorithm for training a neural network was explained. Here, we explore in detail a variety of gradient-based optimisation algorithms designed to perform better than batch gradient descent, and compare their strengths and limitations. 
 
 ### Chapter 5: Application to Differential Equations
 
-We outline the Lagaris method for solving differential equations using neural networks, which differs greatly from traditional (finite-difference) approaches for solving differential equations numerically. We then apply this to a few different examples (ODEs of various orders, systems of ODEs, linear and non-linear PDEs) to illustrate its efficacy and stumbling blocks. Simultaneously, we test the effect of varying the aspects of our training methodology discussed in chapters 2 and 4, and encounter a powerful method known as curriculum learning. The code corresponding to these examples can be found in the **LagarisProblems** folder.
+We outline the Lagaris method for solving differential equations using neural networks, which differs greatly from traditional (finite-difference) approaches for solving differential equations numerically. We then apply this to a few different examples (ODEs of various orders, systems of ODEs, linear and non-linear PDEs) to illustrate its efficacy and stumbling blocks. Simultaneously, we test the effect of varying the aspects of our training methodology discussed in chapters 2 and 4, and encounter an effective method known as curriculum learning. The code corresponding to these examples can be found in the **LagarisProblems** folder.
 
 ### Chapter 6: Solution Bundles
 
@@ -56,7 +56,16 @@ Samples of the most relevant code referenced in the paper are included here.
 
 ### Bibliography
 
-All sources used are cited here. See below for the references I found most important and useful.
+All sources used are cited here. See below for the resources I found most important and useful.
+
+## Repository Contents
+* **Graphs:** Images and graphs included in the final report.
+* **LagarisProblems:** Code to solve the first eight examples given in the Lagaris paper (chapter 5).
+* **OldVersions:** Draft versions of code included in other folders.
+* **ThreeBodyProblem:** Code to approximate solution bundles to the planar circular restricted three-body problem (chapter 6).
+* **burgersEquations:** Code to approximate the solution to Burger's equation and estimate the equation's unknown parameters (chapter 7).
+* **pthFiles:** Trained networks' parameter values stored in pth files.
+* **FinalReport:** Final dissertation submitted, 55 pages plus appendices.
 
 ## Packages Used
 * PyTorch Version 1.12.1
@@ -65,14 +74,13 @@ All sources used are cited here. See below for the references I found most impor
 * SciPy Version 1.9.1
 
 ## Key Sources
-
 ### Neural Networks:
 Michael A. Nielsen. Neural Networks and Deep Learning. Determination Press, 2018. url: http://neuralnetworksanddeeplearning.com.
 
 Ian Goodfellow, Yoshua Bengio, and Aaron Courville. Deep Learning. MIT Press, 2016. url: http://www.deeplearningbook.org.
 
 ### Automatic Differentiation:
-Atilim Gunes Baydin, Barak A. Pearlmutter, and Alexey Andreyevich Radul. “Automaticdifferentiation in machine learning: a survey”. In: CoRR abs/1502.05767 (2015). arXiv:1502.05767. url: http://arxiv.org/abs/1502.05767.
+Atilim Gunes Baydin, Barak A. Pearlmutter, and Alexey Andreyevich Radul. “Automatic differentiation in machine learning: a survey”. In: CoRR abs/1502.05767 (2015). arXiv:1502.05767. url: http://arxiv.org/abs/1502.05767.
 
 ### The Universal Approximation Theorem:
 Moshe Leshno et al. “Multilayer feedforward networks with a nonpolynomial activation function can approximate any function”. In: Neural Networks 6.6 (1993), pp. 861–867. issn: 0893-6080. doi: https://doi.org/10.1016/S0893-6080(05)80131-5. url: https://www.sciencedirect.com/science/article/pii/S0893608005801315.
