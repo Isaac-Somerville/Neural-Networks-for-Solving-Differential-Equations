@@ -38,7 +38,7 @@ In chapter 2 the basic batch gradient descent algorithm for training a neural ne
 ### Chapter 5: Application to Differential Equations
 
 We outline the Lagaris method for solving differential equations using neural networks, which
-differs greatly from traditional approaches for solving differential equations numerically. We then apply this to a few different examples (ODEs of various orders, systems of ODEs, linear and non-linear PDEs) to illustrate its efficacy. We also take this opportunity to investigate the effect of 
+differs greatly from traditional approaches for solving differential equations numerically. We then apply this to a few different examples (ODEs of various orders, systems of ODEs, linear and non-linear PDEs) to illustrate its efficacy. We also take this opportunity to test the effect of varying the aspects of our training methodology discussed in chapters 2 and 4.
 
 Moshe Leshno et al. “Multilayer feedforward networks with a nonpolynomial activation function can approximate any function”. In: Neural Networks 6.6 (1993), pp. 861–867. issn: 0893-6080. doi: https://doi.org/10.1016/S0893-6080(05)80131-5. url: https://www.sciencedirect.com/science/article/pii/S0893608005801315.
 
