@@ -43,7 +43,7 @@ We outline the Lagaris method for solving differential equations using neural ne
 ### Chapter 6: Solution Bundles
 
 We consider a powerful extension of the Lagaris method, proposed in 2020, in which a neural network is trained to approximate the solution of a given differential equation on a *range of initial conditions*. We see the alterations this necessitates in our method, including the use of a GPU, and use a restricted version of the famous three-body problem to illustrate the method. We compare various modes of curriculum learning and observe its limitations. Finally, we give an overview of how this extended version of the Lagaris method compares to traditional finite-difference methods. The **ThreeBodyProblem** folder contains code for this chapter. 
-> <img src="Graphs/3body.png" alt="3body" width="400"/> <img src="Graphs/3bodyCost.png" alt="costs" width="400"/> <br>
+> <img src="Graphs/3body.png" alt="3body" width="380"/> <img src="Graphs/3bodyCost.png" alt="costs" width="380"/> <br>
 > Left: Output of neural network trained to solve the planar circular restricted three-body problem on a bundle of initial conditions, compared to the 4th-order Runge-Kutta solution. The Earth and the moon are shown in blue and orange.
 >
 > Right: Training cost values of this network, trained on 3,000,000 batches of 10,000 inputs. The use of a learning rate scheduler during training leads to the sequence of "steps" observed in the cost graph.
