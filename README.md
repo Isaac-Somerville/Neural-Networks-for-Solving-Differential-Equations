@@ -16,15 +16,23 @@ We give a brief summary of the histories of both artificial neural networks and 
 
 ### Chapter 2: Neural Networks
 
-We begin by understanding some basic notions in the study of neural networks, with our desired applications in mind. We see the fundamental components that make up a neural network, and a common method of training them. Then, we explore automatic differentiation, the computational technique behind a crucial part of their training: the backpropagation algorithm. 
+We begin by understanding some basic notions in the study of neural networks, with our desired applications in mind. We see the fundamental components that make up a neural network, and a common method of training them. Then, we explore automatic differentiation, the computational technique behind a crucial part of their training: the backpropagation algorithm.
+> ![NNScreenshot](/Graphs/NNScreenshot.png "A fully-connected, feedforward neural network with n inputs, k outputs and five hidden layers each made up of m nodes")
+> A fully-connected, feedforward neural network with *n* inputs, *k* outputs and five hidden layers each made up of *m* nodes.
 
 ### Chapter 3: Function Approximation
 
 We explain why neural networks are suited to the task of function approximation, and then give an introduction to PyTorch, the machine learning library used throughout this project. We demonstrate a basic example of using a neural network in PyTorch to approximate sin(x).
+> ![UATScreenshot](/Graphs/UATScreenshot.png "The Universal Approximation Theorem")
+> The Universal Approximation Theorem: neural networks can approximate any continuous function to arbitrary accuracy (on compact domains). Note that versions of the theorem also exist for other classes of functions.
 
 ### Chapter 4: Optimisation Algorithms
 
 In chapter 2 the basic batch gradient descent algorithm for training a neural network was explained. Here, we explore in detail a variety of gradient-based optimisation algorithms designed to perform better than batch gradient descent, and compare their strengths and limitations. 
+>![momentum](/Graphs/momentum.png "The effect of momentum")  
+> Smoothing effect of momentum on gradient descent. Movement is dampened along parameter axes
+where gradients fluctuate more, while progress is unchanged for parameters with more constant gradients (taken
+from [towardsdatascience.com/gradient-descent](https://towardsdatascience.com/gradient-descent-explained-9b953fc0d2c)).
 
 ### Chapter 5: Application to Differential Equations
 
